@@ -16,7 +16,7 @@ describe('preparacion de partidas online', () => {
   });
 
   it.each(DECK_CATALOG)('permite al invitado elegir $name', ({ id, commanderFaction }) => {
-    const waitingState = createOnlineGameState('FURIA');
+    const waitingState = createOnlineGameState('FURIA_EMBESTIDA');
     const hostDeckBeforeJoin = completeDeckIds(waitingState, 'player');
     const readyState = configureOnlineGuestDeck(waitingState, id);
 

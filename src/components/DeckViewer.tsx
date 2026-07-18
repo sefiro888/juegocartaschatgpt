@@ -15,7 +15,7 @@ interface GroupedCard {
 }
 
 export const DeckViewer: React.FC<DeckViewerProps> = ({ onBack }) => {
-  const [activeDeckId, setActiveDeckId] = useState<DeckId>('FURIA');
+  const [activeDeckId, setActiveDeckId] = useState<DeckId>('FURIA_EMBESTIDA');
   const [inspectedCard, setInspectedCard] = useState<Card | null>(null);
   const activeDeck = DECK_CATALOG.find((deck) => deck.id === activeDeckId) ?? DECK_CATALOG[0];
   const deck = useMemo(() => getPreconstructedDeck(activeDeck.id), [activeDeck.id]);
@@ -179,6 +179,10 @@ export const DeckViewer: React.FC<DeckViewerProps> = ({ onBack }) => {
         .deck-card-tile-meta strong { color: #e8f6fb; font-size: .7rem; }
         .tone-furia { --deck-accent: #ff8a65; --deck-accent-border: rgba(255,138,101,.34); --deck-active-bg: rgba(255,93,54,.13); --deck-showcase-bg: linear-gradient(105deg, rgba(67,25,22,.92), rgba(16,27,35,.92)); --deck-mark-bg: rgba(255,93,54,.12); --deck-mark-glow: rgba(255,93,54,.3); }
         .tone-arcano { --deck-accent: #8bddff; --deck-accent-border: rgba(139,221,255,.34); --deck-active-bg: rgba(39,142,183,.15); --deck-showcase-bg: linear-gradient(105deg, rgba(15,49,67,.92), rgba(14,27,39,.92)); --deck-mark-bg: rgba(139,221,255,.1); --deck-mark-glow: rgba(139,221,255,.24); }
+        .tone-naturaleza { --deck-accent: #64e39a; --deck-accent-border: rgba(100,227,154,.32); --deck-active-bg: rgba(40,139,87,.16); --deck-showcase-bg: linear-gradient(105deg, rgba(20,63,42,.92), rgba(16,31,35,.92)); --deck-mark-bg: rgba(100,227,154,.1); --deck-mark-glow: rgba(100,227,154,.2); }
+        .tone-orden { --deck-accent: #e8c46c; --deck-accent-border: rgba(232,196,108,.34); --deck-active-bg: rgba(154,119,45,.15); --deck-showcase-bg: linear-gradient(105deg, rgba(68,55,28,.92), rgba(23,31,36,.92)); --deck-mark-bg: rgba(232,196,108,.1); --deck-mark-glow: rgba(232,196,108,.2); }
+        .tone-sombra { --deck-accent: #b99cff; --deck-accent-border: rgba(185,156,255,.32); --deck-active-bg: rgba(92,60,151,.16); --deck-showcase-bg: linear-gradient(105deg, rgba(42,30,65,.92), rgba(19,26,35,.92)); --deck-mark-bg: rgba(185,156,255,.1); --deck-mark-glow: rgba(185,156,255,.2); }
+        .tone-vacio { --deck-accent: #d5a0ff; --deck-accent-border: rgba(213,160,255,.34); --deck-active-bg: rgba(112,61,162,.16); --deck-showcase-bg: linear-gradient(105deg, rgba(48,30,72,.92), rgba(16,26,39,.92)); --deck-mark-bg: rgba(213,160,255,.1); --deck-mark-glow: rgba(213,160,255,.22); }
         .tone-neutral { --deck-accent: #d0b1ff; --deck-accent-border: rgba(208,177,255,.3); --deck-active-bg: rgba(126,87,180,.15); --deck-showcase-bg: linear-gradient(105deg, rgba(38,31,63,.92), rgba(15,25,35,.92)); --deck-mark-bg: rgba(208,177,255,.1); --deck-mark-glow: rgba(208,177,255,.2); }
         .lore-vault-overlay { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; padding: 28px; background: rgba(0,0,0,.82); backdrop-filter: blur(14px); }
         .lore-vault-content { position: relative; display: grid; grid-template-columns: 350px minmax(0,1fr); gap: 35px; width: min(960px, 94vw); max-height: 90vh; padding: 36px; overflow: hidden; border: 1px solid rgba(255,255,255,.13); box-shadow: 0 25px 80px rgba(0,0,0,.75); }

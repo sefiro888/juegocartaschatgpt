@@ -1,4 +1,5 @@
 import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+import { DECK_CATALOG, type DeckDefinition } from './core/deckCatalog';
 
 const Gallery = lazy(async () => {
   const module = await import('./components/Gallery');
@@ -24,6 +25,52 @@ const GameHUD = lazy(async () => {
 });
 
 type ViewMode = 'menu' | 'faction-select' | 'online-lobby' | 'game' | 'gallery' | 'deck-viewer';
+
+const FACTION_COPY: Record<DeckDefinition['faction'], {
+  title: string;
+  icon: string;
+  lore: string;
+  traits: string[];
+}> = {
+  Furia: {
+    title: 'FURIA',
+    icon: 'F',
+    lore: 'Presion, fuego y criaturas que obligan al rival a responder desde el primer turno.',
+    traits: ['Agresivo', 'Dano directo'],
+  },
+  Arcano: {
+    title: 'ARCANO',
+    icon: 'A',
+    lore: 'Hielo, robo de cartas y control del ritmo para convertir cada turno en una ventaja.',
+    traits: ['Control', 'Hechizos'],
+  },
+  Naturaleza: {
+    title: 'NATURALEZA',
+    icon: 'N',
+    lore: 'Bestias, curacion y crecimiento constante para dominar el tablero con presencia viva.',
+    traits: ['Bestias', 'Curacion'],
+  },
+  Orden: {
+    title: 'ORDEN',
+    icon: 'O',
+    lore: 'Defensa, vuelo y luz sagrada para jugar limpio, resistente y muy tactico.',
+    traits: ['Defensa', 'Vuelo'],
+  },
+  Sombra: {
+    title: 'SOMBRA',
+    icon: 'S',
+    lore: 'No-muertos, vampiros y desgaste para ganar a traves de presion silenciosa.',
+    traits: ['Desgaste', 'Siniestro'],
+  },
+  Vacio: {
+    title: 'VACIO',
+    icon: 'V',
+    lore: 'Horrores cosmicos, aniquilacion y amenazas lentas que cambian la partida.',
+    traits: ['Cosmico', 'Late game'],
+  },
+};
+
+const FACTIONS = ['Furia', 'Arcano', 'Naturaleza', 'Orden', 'Sombra', 'Vacio'] as const;
 
 class ViewErrorBoundary extends Component<
   { children: ReactNode; onExit: () => void },
@@ -97,9 +144,9 @@ function App() {
     setView('online-lobby');
   }, []);
 
-  const handleSelectFaction = async (faction: 'FURIA' | 'ARCANO', theme: string) => {
+  const handleSelectDeck = async (deck: DeckDefinition) => {
     const [, { useGameStore }] = await Promise.all([loadGameHUD(), loadGameStore()]);
-    useGameStore.getState().startNewGame(faction, theme);
+    useGameStore.getState().startNewGame(deck.commanderFaction, deck.id);
     navigateTo('game');
   };
 
@@ -159,144 +206,34 @@ function App() {
           <p className="select-desc">Selecciona uno de los mazos temáticos de 50 cartas para iniciar la batalla</p>
 
           <div className="factions-grid">
-            {/* FURIA */}
-            <div className="faction-card furia glass-panel">
-              <div className="faction-art-preview furia-art">
-                <div className="faction-art-icon">🔥</div>
-              </div>
-              <h3>IGNIS</h3>
-              <p className="faction-commander-title">Cólera del Nexo (Furia)</p>
-              <div className="faction-lore">
-                "Fuego consumidor, ataques rápidos y destrucción. Elige tu estrategia para quemar el nexo enemigo."
-              </div>
-              <div className="faction-traits">
-                <span className="trait">⚔️ Agresivo</span>
-                <span className="trait">💥 Daño directo</span>
-              </div>
-              
-              <div className="deck-choices-list">
-                <button type="button" className="deck-choice-item" onClick={() => handleSelectFaction('FURIA', 'FURIA')}>
-                  <h4>🔥 Mazo Clásico</h4>
-                  <p>Equilibrio ofensivo con criaturas y hechizos clásicos.</p>
-                </button>
-                <button type="button" className="deck-choice-item" onClick={() => handleSelectFaction('FURIA', 'FURIA_AGRO')}>
-                  <h4>⚡ Fuego Rápido (Agro)</h4>
-                  <p>Invocaciones veloces de Trasgos y Sabuesos de carga.</p>
-                </button>
-                <button type="button" className="deck-choice-item" onClick={() => handleSelectFaction('FURIA', 'FURIA_CONTROL')}>
-                  <h4>🌋 Caldera (Control)</h4>
-                  <p>Grandes Dragones, volcanes y hechizos de daño masivo.</p>
-                </button>
-              </div>
-            </div>
+            {FACTIONS.map((faction) => {
+              const copy = FACTION_COPY[faction];
+              const decks = DECK_CATALOG.filter((deck) => deck.faction === faction);
 
-            {/* ARCANO */}
-            <div className="faction-card arcano glass-panel">
-              <div className="faction-art-preview arcano-art">
-                <div className="faction-art-icon">❄️</div>
-              </div>
-              <h3>AETHELGARD</h3>
-              <p className="faction-commander-title">Sabio del Domo (Arcano)</p>
-              <div className="faction-lore">
-                "Control de hielo, barreras rúnicas y robo de cartas. Elige tu estrategia para dominar el tiempo."
-              </div>
-              <div className="faction-traits">
-                <span className="trait">🛡️ Defensivo</span>
-                <span className="trait">❄️ Control</span>
-              </div>
+              return (
+                <div key={faction} className={`faction-card ${decks[0]?.tone ?? 'arcano'} glass-panel`}>
+                  <div className={`faction-art-preview ${decks[0]?.tone ?? 'arcano'}-art`}>
+                    <div className="faction-art-icon">{copy.icon}</div>
+                  </div>
+                  <h3>{copy.title}</h3>
+                  <p className="faction-commander-title">2 mazos disponibles</p>
+                  <div className="faction-lore">{copy.lore}</div>
+                  <div className="faction-traits">
+                    {copy.traits.map((trait) => <span key={trait} className="trait">{trait}</span>)}
+                  </div>
 
-              <div className="deck-choices-list">
-                <button type="button" className="deck-choice-item" onClick={() => handleSelectFaction('ARCANO', 'ARCANO')}>
-                  <h4>❄️ Mazo Clásico</h4>
-                  <p>Control y robo de maná clásico balanceado.</p>
-                </button>
-                <button type="button" className="deck-choice-item" onClick={() => handleSelectFaction('ARCANO', 'ARCANO_FREEZE')}>
-                  <h4>🥶 Ventisca (Control)</h4>
-                  <p>Muros de escarcha, Golems de glaciar y congelamiento.</p>
-                </button>
-                <button type="button" className="deck-choice-item" onClick={() => handleSelectFaction('ARCANO', 'ARCANO_SPELL')}>
-                  <h4>🔮 Magia de Runas (Combo)</h4>
-                  <p>Búhos arcanos, tejedores del tiempo y combo de hechizos.</p>
-                </button>
-              </div>
-            </div>
-
-            {/* HÍBRIDOS Y ESPECIALES */}
-            <div className="faction-card hybrid glass-panel">
-              <div className="faction-art-preview hybrid-art">
-                <div className="faction-art-icon">⚡</div>
-              </div>
-              <h3>NEXO</h3>
-              <p className="faction-commander-title">Mazos Híbridos & Temáticos</p>
-              <div className="faction-lore">
-                "Combina las fuerzas del fuego y del hielo, o utiliza la sinergia oculta de las Bestias y las Estructuras sagradas."
-              </div>
-              <div className="faction-traits">
-                <span className="trait hybrid-tag">⚡ Híbrido</span>
-                <span className="trait hybrid-tag">⚜️ Sinergia</span>
-              </div>
-
-              <div className="deck-choices-list">
-                <button type="button" className="deck-choice-item" onClick={() => handleSelectFaction('FURIA', 'NEXO_HIBRIDO')}>
-                  <h4>⚡ Combustión Rúnica</h4>
-                  <p>Mezcla agresiva de Furia y control congelante de Arcano.</p>
-                </button>
-                <button type="button" className="deck-choice-item" onClick={() => handleSelectFaction('FURIA', 'BARAJA_BESTIAS')}>
-                  <h4>🦁 Manada del Nexo</h4>
-                  <p>Bestias: Sabuesos, Búhos, Dracos y Elementales.</p>
-                </button>
-                <button type="button" className="deck-choice-item" onClick={() => handleSelectFaction('ARCANO', 'FORTALEZA_RUNICA')}>
-                  <h4>🛡️ Fortaleza Antigua</h4>
-                  <p>Estructuras defensivas, Forjas y Golems colosales.</p>
-                </button>
-                <button type="button" className="deck-choice-item" onClick={() => handleSelectFaction('ARCANO', 'MAZO_SOMBRA')}>
-                  <h4>🕸️ Reino Umbrío</h4>
-                  <p>Fieles de Sombra: Espectros, Vampiros y Nigromancia.</p>
-                </button>
-                <button type="button" className="deck-choice-item" onClick={() => handleSelectFaction('FURIA', 'MAZO_NATURALEZA')}>
-                  <h4>🌿 Abrazo Forestal</h4>
-                  <p>Naturaleza pura: Centauros, Lobos y Sanaciones salvajes.</p>
-                </button>
-                <button type="button" className="deck-choice-item" onClick={() => handleSelectFaction('ARCANO', 'MAZO_CELESTIAL')}>
-                  <h4>🦅 Reinos del Aire</h4>
-                  <p>Animales Celestiales: Ángeles, Grifos, Halcones y Pegasos.</p>
-                </button>
-                <button type="button" className="deck-choice-item" onClick={() => handleSelectFaction('ARCANO', 'MAZO_ACUATICO')}>
-                  <h4>🌊 Abismo Marino</h4>
-                  <p>Criaturas acuáticas, Leviatanes y magias de agua abisales.</p>
-                </button>
-                <button type="button" className="deck-choice-item" onClick={() => handleSelectFaction('FURIA', 'MAZO_RENEGADOS')}>
-                  <h4>🗑️ Pila de Renegados</h4>
-                  <p>Cartas rechazadas, descartes caóticos y Goblins locos.</p>
-                </button>
-                <button type="button" className="deck-choice-item" onClick={() => handleSelectFaction('FURIA', 'MAZO_ORCOS_BESTIAS')}>
-                  <h4>👹 Horda Orca</h4>
-                  <p>Sinergia brutal de Orcos de Sombra y Bestias de Furia.</p>
-                </button>
-                <button type="button" className="deck-choice-item" onClick={() => handleSelectFaction('ARCANO', 'MAZO_VACIO')}>
-                  <h4>🌌 Vacío Entrópico</h4>
-                  <p>Falla del Vacío: Horrores, parásitos y magias de aniquilación.</p>
-                </button>
-                <button type="button" className="deck-choice-item" onClick={() => handleSelectFaction('ARCANO', 'MAZO_ORDEN')}>
-                  <h4>🛡️ Edicto Sagrado</h4>
-                  <p>Unidades de Orden: Ángeles, paladines y escudos divinos.</p>
-                </button>
-                <button type="button" className="deck-choice-item" onClick={() => handleSelectFaction('FURIA', 'MAZO_ULTIMO_ALIENTO')}>
-                  <h4>💀 Último Aliento</h4>
-                  <p>Mazo de sacrificio y fénix que reviven al morir.</p>
-                </button>
-                <button type="button" className="deck-choice-item" onClick={() => handleSelectFaction('FURIA', 'MAZO_DOBLE_ATAQUE')}>
-                  <h4>🌪️ Ráfaga de Furia</h4>
-                  <p>Doble golpe: Atacantes que golpean dos veces por turno.</p>
-                </button>
-                <button type="button" className="deck-choice-item" onClick={() => handleSelectFaction('FURIA', 'MAZO_FORESTAL_CONTROL')}>
-                  <h4>🌳 Raíces de Vida</h4>
-                  <p>Control de Naturaleza: Curación constante y muros gruesos.</p>
-                </button>
-              </div>
-            </div>
+                  <div className="deck-choices-list">
+                    {decks.map((deck) => (
+                      <button type="button" key={deck.id} className="deck-choice-item" onClick={() => handleSelectDeck(deck)}>
+                        <h4>{deck.name}</h4>
+                        <p>{deck.archetype} / {deck.description}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-
           <button className="back-menu-btn" onClick={() => navigateTo('menu')}>
             ← Volver al Menú
           </button>
@@ -541,9 +478,10 @@ function App() {
         }
 
          .factions-grid {
-          display: flex;
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 24px;
-          max-width: 1200px;
+          max-width: 1360px;
           width: 100%;
           margin-bottom: 40px;
           z-index: 1;
@@ -551,7 +489,6 @@ function App() {
         }
 
         .faction-card {
-          flex: 1;
           padding: 30px 24px;
           display: flex;
           flex-direction: column;
@@ -575,10 +512,28 @@ function App() {
           border-color: var(--color-arcano);
         }
 
-        .faction-card.hybrid:hover {
+        .faction-card.naturaleza:hover {
+          transform: translateY(-12px) scale(1.02);
+          box-shadow: 0 15px 40px rgba(76, 211, 139, 0.22);
+          border-color: #56d68f;
+        }
+
+        .faction-card.orden:hover {
+          transform: translateY(-12px) scale(1.02);
+          box-shadow: 0 15px 40px rgba(232, 196, 108, 0.22);
+          border-color: #e8c46c;
+        }
+
+        .faction-card.sombra:hover {
           transform: translateY(-12px) scale(1.02);
           box-shadow: 0 15px 40px rgba(139, 92, 246, 0.25);
           border-color: #8b5cf6;
+        }
+
+        .faction-card.vacio:hover {
+          transform: translateY(-12px) scale(1.02);
+          box-shadow: 0 15px 40px rgba(196, 125, 255, 0.25);
+          border-color: #c47dff;
         }
 
         .trait.hybrid-tag {
@@ -612,8 +567,30 @@ function App() {
           border: 2px solid rgba(0, 217, 255, 0.3);
           box-shadow: 0 0 20px rgba(0, 217, 255, 0.15);
         }
+        .naturaleza-art {
+          background: radial-gradient(circle, rgba(86, 214, 143, 0.22), rgba(86, 214, 143, 0.05));
+          border: 2px solid rgba(86, 214, 143, 0.32);
+          box-shadow: 0 0 20px rgba(86, 214, 143, 0.14);
+        }
+        .orden-art {
+          background: radial-gradient(circle, rgba(232, 196, 108, 0.22), rgba(232, 196, 108, 0.05));
+          border: 2px solid rgba(232, 196, 108, 0.32);
+          box-shadow: 0 0 20px rgba(232, 196, 108, 0.14);
+        }
+        .sombra-art {
+          background: radial-gradient(circle, rgba(139, 92, 246, 0.22), rgba(139, 92, 246, 0.05));
+          border: 2px solid rgba(139, 92, 246, 0.32);
+          box-shadow: 0 0 20px rgba(139, 92, 246, 0.14);
+        }
+        .vacio-art {
+          background: radial-gradient(circle, rgba(196, 125, 255, 0.24), rgba(196, 125, 255, 0.05));
+          border: 2px solid rgba(196, 125, 255, 0.34);
+          box-shadow: 0 0 20px rgba(196, 125, 255, 0.15);
+        }
         .faction-art-icon {
-          font-size: 2.5rem;
+          font-size: 2rem;
+          font-weight: 900;
+          letter-spacing: 0;
         }
 
         .faction-card h3 {
@@ -623,6 +600,10 @@ function App() {
 
         .faction-card.furia h3 { color: var(--color-furia); }
         .faction-card.arcano h3 { color: var(--color-arcano); }
+        .faction-card.naturaleza h3 { color: #64e39a; }
+        .faction-card.orden h3 { color: #e8c46c; }
+        .faction-card.sombra h3 { color: #b99cff; }
+        .faction-card.vacio h3 { color: #d5a0ff; }
 
         .faction-commander-title {
           font-size: 0.85rem;

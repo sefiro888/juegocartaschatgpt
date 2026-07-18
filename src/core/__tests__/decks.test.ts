@@ -4,21 +4,41 @@ import { DECK_CATALOG } from '../deckCatalog';
 import { CardSchema } from '../../types/card';
 
 describe('mazos preconstruidos', () => {
-  it('publica 20 mazos sin identificadores duplicados', () => {
-    expect(DECK_CATALOG).toHaveLength(20);
+  it('publica 12 mazos sin identificadores duplicados', () => {
+    expect(DECK_CATALOG).toHaveLength(12);
     expect(new Set(DECK_CATALOG.map((deck) => deck.id)).size).toBe(DECK_CATALOG.length);
   });
 
-  it.each(DECK_CATALOG)('$id contiene 50 cartas validas', ({ id }) => {
+  it('publica exactamente dos mazos por faccion', () => {
+    const counts = DECK_CATALOG.reduce<Record<string, number>>((acc, deck) => {
+      acc[deck.faction] = (acc[deck.faction] ?? 0) + 1;
+      return acc;
+    }, {});
+
+    expect(counts).toEqual({
+      Furia: 2,
+      Arcano: 2,
+      Naturaleza: 2,
+      Orden: 2,
+      Sombra: 2,
+      Vacio: 2,
+    });
+  });
+
+  it.each(DECK_CATALOG)('$id contiene 50 cartas validas con ilustracion final', ({ id }) => {
     const deck = getPreconstructedDeck(id);
 
     expect(deck).toHaveLength(50);
-    deck.forEach((card) => expect(CardSchema.safeParse(card).success).toBe(true));
+    deck.forEach((card) => {
+      expect(CardSchema.safeParse(card).success).toBe(true);
+      expect(card.id.startsWith('gen-')).toBe(false);
+      expect(card.artPath).toMatch(/\.(webp|png)$/);
+    });
   });
 
   it('incluye al Devorador Entropico en el mazo de Vacio', () => {
     const card = CARDS_DB['devorador-entropico'];
-    const deck = getPreconstructedDeck('MAZO_VACIO');
+    const deck = getPreconstructedDeck('VACIO_ABISMO');
 
     expect(CardSchema.safeParse(card).success).toBe(true);
     expect(card.artPath).toBe('/assets/cards/art/devorador-entropico.webp');

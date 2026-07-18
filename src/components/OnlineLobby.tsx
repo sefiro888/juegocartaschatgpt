@@ -10,7 +10,7 @@ interface OnlineLobbyProps {
 }
 
 export const OnlineLobby: React.FC<OnlineLobbyProps> = ({ initialRoomCode = '', onEnterGame, onBack }) => {
-  const [deckId, setDeckId] = useState<DeckId>('FURIA');
+  const [deckId, setDeckId] = useState<DeckId>('FURIA_EMBESTIDA');
   const [roomCode, setRoomCode] = useState(initialRoomCode.toUpperCase());
   const [inviteLink, setInviteLink] = useState('');
   const [copied, setCopied] = useState(false);
@@ -163,6 +163,10 @@ export const OnlineLobby: React.FC<OnlineLobbyProps> = ({ initialRoomCode = '', 
         .online-deck-selector { display: grid; grid-template-columns: 54px minmax(240px, 0.9fr) minmax(0, 1.1fr); align-items: center; gap: 16px; padding: 16px; border: 1px solid rgba(171, 212, 231, 0.17); border-radius: 7px; background: rgba(255, 255, 255, 0.04); }
         .online-deck-selector.tone-furia, .online-room-deck.tone-furia { border-color: rgba(255, 112, 89, 0.34); background: rgba(112, 35, 29, 0.15); }
         .online-deck-selector.tone-arcano, .online-room-deck.tone-arcano { border-color: rgba(88, 205, 249, 0.34); background: rgba(24, 82, 112, 0.18); }
+        .online-deck-selector.tone-naturaleza, .online-room-deck.tone-naturaleza { border-color: rgba(100, 227, 154, 0.34); background: rgba(25, 91, 56, 0.16); }
+        .online-deck-selector.tone-orden, .online-room-deck.tone-orden { border-color: rgba(232, 196, 108, 0.34); background: rgba(94, 73, 31, 0.16); }
+        .online-deck-selector.tone-sombra, .online-room-deck.tone-sombra { border-color: rgba(185, 156, 255, 0.34); background: rgba(63, 42, 104, 0.16); }
+        .online-deck-selector.tone-vacio, .online-room-deck.tone-vacio { border-color: rgba(213, 160, 255, 0.34); background: rgba(74, 39, 112, 0.16); }
         .online-deck-mark { width: 54px; height: 54px; display: grid; place-items: center; border: 1px solid rgba(185, 226, 242, 0.25); border-radius: 6px; color: #f2fbff; background: rgba(4, 14, 23, 0.72); font: 800 1.35rem var(--font-display); }
         .online-deck-field { display: grid; gap: 7px; color: #90b3c2; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
         .online-deck-field select { width: 100%; min-height: 46px; padding: 9px 36px 9px 11px; border: 1px solid rgba(174, 222, 239, 0.26); border-radius: 5px; color: #effbff; background: #0a1824; font: 700 0.82rem var(--font-sans); }

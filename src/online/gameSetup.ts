@@ -1,5 +1,5 @@
 import { CARDS_DB, getPreconstructedDeck } from '../core/cardsDb';
-import { getDeckDefinition, type DeckId } from '../core/deckCatalog';
+import { DECK_CATALOG, getDeckDefinition, type DeckId } from '../core/deckCatalog';
 import { initializeGame } from '../core/engine';
 import type { Card, GameState } from '../types/card';
 
@@ -11,7 +11,7 @@ function getCommander(faction: 'FURIA' | 'ARCANO'): Card {
 
 export function createOnlineGameState(hostDeckId: DeckId): GameState {
   const hostDeck = getDeckDefinition(hostDeckId);
-  const guestDeckId: DeckId = hostDeck.commanderFaction === 'FURIA' ? 'ARCANO' : 'FURIA';
+  const guestDeckId = DECK_CATALOG.find((deck) => deck.commanderFaction !== hostDeck.commanderFaction)?.id ?? 'ARCANO_GLACIAL';
   const guestDeck = getDeckDefinition(guestDeckId);
 
   return initializeGame(

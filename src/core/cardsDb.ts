@@ -1,4 +1,5 @@
 import type { Card, Faction } from '../types/card';
+import type { DeckId } from './deckCatalog';
 
 export const CARDS_DB: Record<string, Card> = {
   // --- FURIA (20 cartas, IDs 1-12, 25-32) ---
@@ -1890,7 +1891,259 @@ function generateRemainingCards() {
 // Generate the remaining 360 cards immediately
 generateRemainingCards();
 
+type DeckRecipeEntry = { id: string; count: number };
+type ManaPlan = { furia: number; arcano: number };
+type CuratedDeckRecipe = { mana: ManaPlan; cards: DeckRecipeEntry[] };
+
+const CURATED_DECK_RECIPES: Record<DeckId, CuratedDeckRecipe> = {
+  FURIA_EMBESTIDA: {
+    mana: { furia: 20, arcano: 0 },
+    cards: [
+      { id: 'sabueso-brasa', count: 4 },
+      { id: 'trasgo-piroclastico', count: 3 },
+      { id: 'guerrero-ceniza', count: 3 },
+      { id: 'orco-guerrero', count: 3 },
+      { id: 'berserker-ignivoro', count: 2 },
+      { id: 'minotauro-brasa', count: 2 },
+      { id: 'cacique-orco', count: 1 },
+      { id: 'chispa-fugaz', count: 3 },
+      { id: 'lluvia-ceniza', count: 2 },
+      { id: 'impetu-fuego', count: 3 },
+      { id: 'furia-nexo', count: 2 },
+      { id: 'forja-carmesi', count: 2 },
+    ],
+  },
+  FURIA_CALDERA: {
+    mana: { furia: 20, arcano: 0 },
+    cards: [
+      { id: 'muro-pomez', count: 3 },
+      { id: 'forja-carmesi', count: 3 },
+      { id: 'pilar-fuego', count: 2 },
+      { id: 'elemental-lava', count: 3 },
+      { id: 'golem-fundicion', count: 3 },
+      { id: 'draco-magma', count: 2 },
+      { id: 'gigante-magma', count: 2 },
+      { id: 'dragon-caldera', count: 2 },
+      { id: 'lluvia-ceniza', count: 3 },
+      { id: 'erupcion-volcanica', count: 2 },
+      { id: 'furia-nexo', count: 2 },
+      { id: 'fenix-renacido', count: 3 },
+    ],
+  },
+  ARCANO_GLACIAL: {
+    mana: { furia: 0, arcano: 20 },
+    cards: [
+      { id: 'centinela-cristal', count: 3 },
+      { id: 'tejedora-escarcha', count: 3 },
+      { id: 'guardian-escarchado', count: 3 },
+      { id: 'golem-glaciar', count: 2 },
+      { id: 'golem-piedra', count: 2 },
+      { id: 'mago-runa-helada', count: 3 },
+      { id: 'barrera-hielo', count: 3 },
+      { id: 'prision-glacial', count: 3 },
+      { id: 'congelacion-rapida', count: 3 },
+      { id: 'cometa-arcano', count: 2 },
+      { id: 'torre-horizonte', count: 3 },
+    ],
+  },
+  ARCANO_ESTELAR: {
+    mana: { furia: 0, arcano: 20 },
+    cards: [
+      { id: 'aprendiz-nexo', count: 3 },
+      { id: 'buho-runico', count: 3 },
+      { id: 'tejedora-tiempo', count: 3 },
+      { id: 'vortice-mana', count: 3 },
+      { id: 'cometa-arcano', count: 3 },
+      { id: 'tormenta-mana', count: 2 },
+      { id: 'biblioteca-runica', count: 3 },
+      { id: 'obelisco-estelar', count: 2 },
+      { id: 'avatar-cosmos', count: 2 },
+      { id: 'elemental-tormenta', count: 2 },
+      { id: 'destello-runico', count: 2 },
+      { id: 'templo-runico', count: 2 },
+    ],
+  },
+  NATURALEZA_RAICES: {
+    mana: { furia: 14, arcano: 6 },
+    cards: [
+      { id: 'fauno-bosque', count: 4 },
+      { id: 'centauro-guerrero', count: 4 },
+      { id: 'basilisco-caos', count: 4 },
+      { id: 'buho-runico', count: 3 },
+      { id: 'elemental-tormenta', count: 3 },
+      { id: 'centinela-cristal', count: 2 },
+      { id: 'espora-venenosa', count: 3 },
+      { id: 'golem-piedra', count: 3 },
+      { id: 'totem-naturaleza', count: 4 },
+    ],
+  },
+  NATURALEZA_GUARDIANES: {
+    mana: { furia: 12, arcano: 8 },
+    cards: [
+      { id: 'totem-naturaleza', count: 3 },
+      { id: 'fauno-bosque', count: 3 },
+      { id: 'basilisco-caos', count: 3 },
+      { id: 'centauro-guerrero', count: 3 },
+      { id: 'espora-venenosa', count: 3 },
+      { id: 'elemental-tormenta', count: 3 },
+      { id: 'buho-runico', count: 3 },
+      { id: 'golem-piedra', count: 3 },
+      { id: 'guardian-escarchado', count: 3 },
+      { id: 'barrera-hielo', count: 3 },
+    ],
+  },
+  ORDEN_ALBA: {
+    mana: { furia: 4, arcano: 16 },
+    cards: [
+      { id: 'pegaso-celestial', count: 4 },
+      { id: 'grifo-orden', count: 4 },
+      { id: 'clerigo-luz', count: 3 },
+      { id: 'juicio-divino', count: 3 },
+      { id: 'guardian-escarchado', count: 3 },
+      { id: 'centinela-cristal', count: 3 },
+      { id: 'golem-runico', count: 3 },
+      { id: 'torre-horizonte', count: 2 },
+      { id: 'templo-runico', count: 2 },
+      { id: 'destello-runico', count: 3 },
+    ],
+  },
+  ORDEN_BASTION: {
+    mana: { furia: 6, arcano: 14 },
+    cards: [
+      { id: 'clerigo-luz', count: 4 },
+      { id: 'golem-runico', count: 3 },
+      { id: 'guardian-escarchado', count: 3 },
+      { id: 'centinela-cristal', count: 3 },
+      { id: 'barrera-hielo', count: 3 },
+      { id: 'pegaso-celestial', count: 3 },
+      { id: 'grifo-orden', count: 3 },
+      { id: 'templo-runico', count: 3 },
+      { id: 'juicio-divino', count: 3 },
+      { id: 'biblioteca-runica', count: 2 },
+    ],
+  },
+  SOMBRA_CRIPTA: {
+    mana: { furia: 8, arcano: 12 },
+    cards: [
+      { id: 'zombi-hambriento', count: 4 },
+      { id: 'zombi-infectado', count: 4 },
+      { id: 'esqueleto-guerrero', count: 4 },
+      { id: 'espectro-siniestro', count: 3 },
+      { id: 'murcielago-sombra', count: 3 },
+      { id: 'tumba-olvidada', count: 3 },
+      { id: 'horca-renegada', count: 2 },
+      { id: 'vampiro-noble', count: 2 },
+      { id: 'pesadilla-mortal', count: 3 },
+      { id: 'demonio-infernal', count: 2 },
+    ],
+  },
+  SOMBRA_NOBLEZA: {
+    mana: { furia: 10, arcano: 10 },
+    cards: [
+      { id: 'vampiro-noble', count: 4 },
+      { id: 'demonio-infernal', count: 3 },
+      { id: 'pesadilla-mortal', count: 3 },
+      { id: 'espectro-siniestro', count: 3 },
+      { id: 'murcielago-sombra', count: 3 },
+      { id: 'esqueleto-guerrero', count: 3 },
+      { id: 'zombi-infectado', count: 3 },
+      { id: 'horca-renegada', count: 2 },
+      { id: 'tumba-olvidada', count: 3 },
+      { id: 'zombi-hambriento', count: 3 },
+    ],
+  },
+  VACIO_ABISMO: {
+    mana: { furia: 4, arcano: 16 },
+    cards: [
+      { id: 'parasito-vacio', count: 4 },
+      { id: 'devorador-entropico', count: 2 },
+      { id: 'leviatan-abisal', count: 2 },
+      { id: 'basilisco-caos', count: 3 },
+      { id: 'golem-runico', count: 3 },
+      { id: 'tejedora-tiempo', count: 3 },
+      { id: 'elemental-tormenta', count: 3 },
+      { id: 'obelisco-estelar', count: 2 },
+      { id: 'avatar-cosmos', count: 2 },
+      { id: 'cometa-arcano', count: 3 },
+      { id: 'vortice-mana', count: 3 },
+    ],
+  },
+  VACIO_ENTROPIA: {
+    mana: { furia: 6, arcano: 14 },
+    cards: [
+      { id: 'devorador-entropico', count: 3 },
+      { id: 'leviatan-abisal', count: 3 },
+      { id: 'parasito-vacio', count: 3 },
+      { id: 'avatar-cosmos', count: 3 },
+      { id: 'golem-runico', count: 3 },
+      { id: 'basilisco-caos', count: 2 },
+      { id: 'cometa-arcano', count: 3 },
+      { id: 'vortice-mana', count: 3 },
+      { id: 'tejedora-tiempo', count: 3 },
+      { id: 'tormenta-mana', count: 2 },
+      { id: 'obelisco-estelar', count: 2 },
+    ],
+  },
+};
+
+const LEGACY_DECK_ALIASES: Record<string, DeckId> = {
+  FURIA: 'FURIA_EMBESTIDA',
+  FURIA_AGRO: 'FURIA_EMBESTIDA',
+  FURIA_CONTROL: 'FURIA_CALDERA',
+  ARCANO: 'ARCANO_GLACIAL',
+  ARCANO_FREEZE: 'ARCANO_GLACIAL',
+  ARCANO_SPELL: 'ARCANO_ESTELAR',
+  MAZO_NATURALEZA: 'NATURALEZA_RAICES',
+  MAZO_FORESTAL_CONTROL: 'NATURALEZA_GUARDIANES',
+  MAZO_ORDEN: 'ORDEN_BASTION',
+  MAZO_CELESTIAL: 'ORDEN_ALBA',
+  MAZO_SOMBRA: 'SOMBRA_CRIPTA',
+  MAZO_ULTIMO_ALIENTO: 'SOMBRA_CRIPTA',
+  MAZO_VACIO: 'VACIO_ABISMO',
+  MAZO_ACUATICO: 'VACIO_ABISMO',
+  NEXO_HIBRIDO: 'VACIO_ENTROPIA',
+  BARAJA_BESTIAS: 'NATURALEZA_RAICES',
+  FORTALEZA_RUNICA: 'ORDEN_BASTION',
+  MAZO_RENEGADOS: 'SOMBRA_NOBLEZA',
+  MAZO_ORCOS_BESTIAS: 'FURIA_EMBESTIDA',
+  MAZO_DOBLE_ATAQUE: 'FURIA_EMBESTIDA',
+};
+
+function normalizeDeckId(factionOrTheme: string): DeckId {
+  if (factionOrTheme in CURATED_DECK_RECIPES) return factionOrTheme as DeckId;
+  return LEGACY_DECK_ALIASES[factionOrTheme] ?? 'ARCANO_GLACIAL';
+}
+
+function addCards(deck: Card[], cardId: string, count: number, deckId: DeckId) {
+  const card = CARDS_DB[cardId];
+  if (!card) throw new Error(`El mazo ${deckId} referencia una carta inexistente: ${cardId}.`);
+  if (!/\.(webp|png)$/i.test(card.artPath)) {
+    throw new Error(`El mazo ${deckId} contiene una carta sin ilustracion final: ${cardId}.`);
+  }
+
+  for (let i = 0; i < count; i++) deck.push({ ...card });
+}
+
+function buildCuratedDeck(deckId: DeckId): Card[] {
+  const recipe = CURATED_DECK_RECIPES[deckId];
+  const deck: Card[] = [];
+
+  addCards(deck, 'fuente-furia', recipe.mana.furia, deckId);
+  addCards(deck, 'fuente-arcana', recipe.mana.arcano, deckId);
+  recipe.cards.forEach((entry) => addCards(deck, entry.id, entry.count, deckId));
+
+  if (deck.length !== 50) {
+    throw new Error(`El mazo ${deckId} contiene ${deck.length} cartas, debe contener 50.`);
+  }
+
+  return deck;
+}
+
 export function getPreconstructedDeck(factionOrTheme: string): Card[] {
+  const curatedDeckId = normalizeDeckId(factionOrTheme);
+  const curatedDeck = buildCuratedDeck(curatedDeckId);
+  if (curatedDeck.length === 50) return curatedDeck;
+
   const deck: Card[] = [];
   const addFromPool = (preferredPool: Card[], fallbackPool: Card[], count: number) => {
     const pool = preferredPool.length > 0 ? preferredPool : fallbackPool;

@@ -9,7 +9,7 @@ import { isBoardObstacle } from '../core/boardPathfinding';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { OnlineMatchRecord, OnlineSession } from '../online/types';
 import { shouldApplyOnlineRevision } from '../online/syncPolicy';
-import type { DeckId } from '../core/deckCatalog';
+import { DECK_CATALOG, getDeckDefinition, type DeckId } from '../core/deckCatalog';
 import { configureOnlineGuestDeck, createOnlineGameState } from '../online/gameSetup';
 
 type MatchService = typeof import('../online/matchService');
@@ -232,18 +232,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
       void loadMatchService().then((matchService) => matchService.unsubscribeFromOnlineMatch(previousOnlineChannel));
     }
     onlineChannel = null;
+    const selectedDeck = deckTheme ? getDeckDefinition(deckTheme as DeckId) : null;
+    const playerCommanderFaction = selectedDeck?.commanderFaction ?? playerFaction;
     const playerDeck = getPreconstructedDeck(deckTheme || playerFaction);
-    const opponentFaction = playerFaction === 'FURIA' ? 'ARCANO' : 'FURIA';
-    
-    // Choose a random opponent theme to make the battle diverse
-    const oppThemes = opponentFaction === 'FURIA' 
-      ? ['FURIA', 'FURIA_AGRO', 'FURIA_CONTROL'] 
-      : ['ARCANO', 'ARCANO_FREEZE', 'ARCANO_SPELL'];
-    const randomOppTheme = oppThemes[Math.floor(Math.random() * oppThemes.length)];
-    const opponentDeck = getPreconstructedDeck(randomOppTheme);
+    const opponentDeckOptions = DECK_CATALOG.filter((deck) => deck.commanderFaction !== playerCommanderFaction);
+    const randomOpponentDeck = opponentDeckOptions[Math.floor(Math.random() * opponentDeckOptions.length)] ?? DECK_CATALOG[0];
+    const opponentDeck = getPreconstructedDeck(randomOpponentDeck.id);
 
-    const playerCommander = playerFaction === 'FURIA' ? CARDS_DB['comandante-furia'] : CARDS_DB['comandante-arcano'];
-    const opponentCommander = opponentFaction === 'FURIA' ? CARDS_DB['comandante-furia'] : CARDS_DB['comandante-arcano'];
+    const playerCommander = playerCommanderFaction === 'FURIA' ? CARDS_DB['comandante-furia'] : CARDS_DB['comandante-arcano'];
+    const opponentCommander = randomOpponentDeck.commanderFaction === 'FURIA' ? CARDS_DB['comandante-furia'] : CARDS_DB['comandante-arcano'];
 
     const seed = `game-seed-${Date.now()}`;
     const newState = initializeGame(playerDeck, opponentDeck, playerCommander, opponentCommander, seed);
@@ -255,7 +252,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       hoveredEntity: null,
       inspectedCard: null,
       gameEvents: [createGameEvent('La batalla comienza. Controla el santuario.', 'system')],
-      activeFaction: playerFaction,
+      activeFaction: playerCommanderFaction,
       isAIThinking: false,
       presentationAction: null,
       localController: 'PLAYER',

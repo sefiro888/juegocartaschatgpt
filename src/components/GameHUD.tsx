@@ -164,7 +164,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
     const roomCode = new URLSearchParams(window.location.search).get('sala')?.trim().toUpperCase();
     if (!roomCode || roomCode.length !== 6) return;
     stateRecoveryAttempted.current = true;
-    void joinOnlineGame(roomCode, 'FURIA').catch(() => undefined);
+    void joinOnlineGame(roomCode, 'FURIA_EMBESTIDA').catch(() => undefined);
   }, [gameState, joinOnlineGame]);
 
   useEffect(() => {

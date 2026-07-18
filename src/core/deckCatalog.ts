@@ -1,18 +1,25 @@
-export type DeckTone = 'furia' | 'arcano' | 'neutral';
+export type DeckTone = 'furia' | 'arcano' | 'naturaleza' | 'orden' | 'sombra' | 'vacio';
+
+export type DeckFaction = 'Furia' | 'Arcano' | 'Naturaleza' | 'Orden' | 'Sombra' | 'Vacio';
 
 export type DeckId =
-  | 'FURIA' | 'FURIA_AGRO' | 'FURIA_CONTROL'
-  | 'ARCANO' | 'ARCANO_FREEZE' | 'ARCANO_SPELL'
-  | 'NEXO_HIBRIDO' | 'BARAJA_BESTIAS' | 'FORTALEZA_RUNICA'
-  | 'MAZO_VACIO' | 'MAZO_ORDEN' | 'MAZO_ULTIMO_ALIENTO'
-  | 'MAZO_DOBLE_ATAQUE' | 'MAZO_FORESTAL_CONTROL' | 'MAZO_SOMBRA'
-  | 'MAZO_NATURALEZA' | 'MAZO_CELESTIAL' | 'MAZO_ACUATICO'
-  | 'MAZO_RENEGADOS' | 'MAZO_ORCOS_BESTIAS';
+  | 'FURIA_EMBESTIDA'
+  | 'FURIA_CALDERA'
+  | 'ARCANO_GLACIAL'
+  | 'ARCANO_ESTELAR'
+  | 'NATURALEZA_RAICES'
+  | 'NATURALEZA_GUARDIANES'
+  | 'ORDEN_ALBA'
+  | 'ORDEN_BASTION'
+  | 'SOMBRA_CRIPTA'
+  | 'SOMBRA_NOBLEZA'
+  | 'VACIO_ABISMO'
+  | 'VACIO_ENTROPIA';
 
 export interface DeckDefinition {
   id: DeckId;
   name: string;
-  faction: string;
+  faction: DeckFaction;
   commanderFaction: 'FURIA' | 'ARCANO';
   archetype: string;
   description: string;
@@ -21,26 +28,126 @@ export interface DeckDefinition {
 }
 
 export const DECK_CATALOG: readonly DeckDefinition[] = [
-  { id: 'FURIA', name: 'Ignis', faction: 'Furia', commanderFaction: 'FURIA', archetype: 'Clasico', description: 'Presion directa y criaturas de fuego.', tone: 'furia', mark: 'F' },
-  { id: 'FURIA_AGRO', name: 'Fuego Rapido', faction: 'Furia', commanderFaction: 'FURIA', archetype: 'Agro', description: 'Carga, dano temprano y ritmo constante.', tone: 'furia', mark: 'A' },
-  { id: 'FURIA_CONTROL', name: 'Caldera', faction: 'Furia', commanderFaction: 'FURIA', archetype: 'Control', description: 'Dragones grandes y dano de area.', tone: 'furia', mark: 'C' },
-  { id: 'ARCANO', name: 'Aethelgard', faction: 'Arcano', commanderFaction: 'ARCANO', archetype: 'Clasico', description: 'Recursos, control y respuestas flexibles.', tone: 'arcano', mark: 'A' },
-  { id: 'ARCANO_FREEZE', name: 'Ventisca', faction: 'Arcano', commanderFaction: 'ARCANO', archetype: 'Control', description: 'Congela amenazas y gana tiempo.', tone: 'arcano', mark: 'V' },
-  { id: 'ARCANO_SPELL', name: 'Magia de Runas', faction: 'Arcano', commanderFaction: 'ARCANO', archetype: 'Combo', description: 'Hechizos encadenados y robo de cartas.', tone: 'arcano', mark: 'R' },
-  { id: 'NEXO_HIBRIDO', name: 'Nexo Hibrido', faction: 'Mixto', commanderFaction: 'FURIA', archetype: 'Equilibrio', description: 'Amenazas de Furia y Arcano en un solo plan.', tone: 'neutral', mark: 'N' },
-  { id: 'BARAJA_BESTIAS', name: 'Llamada Bestial', faction: 'Mixto', commanderFaction: 'FURIA', archetype: 'Bestias', description: 'Criaturas agresivas con apoyo elemental.', tone: 'neutral', mark: 'B' },
-  { id: 'FORTALEZA_RUNICA', name: 'Fortaleza Runica', faction: 'Mixto', commanderFaction: 'ARCANO', archetype: 'Estructuras', description: 'Torres, muros y defensa progresiva.', tone: 'neutral', mark: 'R' },
-  { id: 'MAZO_VACIO', name: 'Vacio Entropico', faction: 'Vacio', commanderFaction: 'ARCANO', archetype: 'Desgaste', description: 'Horrores y efectos que descomponen el tablero.', tone: 'neutral', mark: 'V' },
-  { id: 'MAZO_ORDEN', name: 'Edicto Sagrado', faction: 'Orden', commanderFaction: 'ARCANO', archetype: 'Proteccion', description: 'Unidades resistentes y escudos divinos.', tone: 'arcano', mark: 'O' },
-  { id: 'MAZO_ULTIMO_ALIENTO', name: 'Ultimo Aliento', faction: 'Mixto', commanderFaction: 'FURIA', archetype: 'Sacrificio', description: 'Morir es solo el comienzo de la siguiente jugada.', tone: 'neutral', mark: 'U' },
-  { id: 'MAZO_DOBLE_ATAQUE', name: 'Rafaga de Furia', faction: 'Mixto', commanderFaction: 'FURIA', archetype: 'Doble golpe', description: 'Cargas y ataques que buscan cerrar la partida.', tone: 'furia', mark: 'D' },
-  { id: 'MAZO_FORESTAL_CONTROL', name: 'Raices de Vida', faction: 'Naturaleza', commanderFaction: 'FURIA', archetype: 'Control', description: 'Curacion, muros y control del terreno.', tone: 'neutral', mark: 'R' },
-  { id: 'MAZO_SOMBRA', name: 'Reino Umbrio', faction: 'Sombra', commanderFaction: 'ARCANO', archetype: 'Niebla', description: 'Espectros, vampiros y presion silenciosa.', tone: 'neutral', mark: 'S' },
-  { id: 'MAZO_NATURALEZA', name: 'Abrazo Forestal', faction: 'Naturaleza', commanderFaction: 'FURIA', archetype: 'Vida', description: 'Bestias, crecimiento y recuperacion.', tone: 'neutral', mark: 'N' },
-  { id: 'MAZO_CELESTIAL', name: 'Reinos del Aire', faction: 'Orden', commanderFaction: 'ARCANO', archetype: 'Celestial', description: 'Criaturas voladoras y presencia desde el cielo.', tone: 'arcano', mark: 'C' },
-  { id: 'MAZO_ACUATICO', name: 'Abismo Marino', faction: 'Abisal', commanderFaction: 'ARCANO', archetype: 'Aguas profundas', description: 'Leviatanes, hielo y amenazas de gran alcance.', tone: 'arcano', mark: 'M' },
-  { id: 'MAZO_RENEGADOS', name: 'Pila de Renegados', faction: 'Mixto', commanderFaction: 'FURIA', archetype: 'Descarte', description: 'Caos, descarte y cartas que vuelven con fuerza.', tone: 'furia', mark: 'X' },
-  { id: 'MAZO_ORCOS_BESTIAS', name: 'Horda Orca', faction: 'Furia', commanderFaction: 'FURIA', archetype: 'Horda', description: 'Orcos y bestias que dominan por volumen.', tone: 'furia', mark: 'H' },
+  {
+    id: 'FURIA_EMBESTIDA',
+    name: 'Embestida de Brasas',
+    faction: 'Furia',
+    commanderFaction: 'FURIA',
+    archetype: 'Agresivo',
+    description: 'Presion temprana con cargas, orcos y dano directo para cerrar la partida rapido.',
+    tone: 'furia',
+    mark: 'F1',
+  },
+  {
+    id: 'FURIA_CALDERA',
+    name: 'Caldera Colosal',
+    faction: 'Furia',
+    commanderFaction: 'FURIA',
+    archetype: 'Colosos',
+    description: 'Aguanta el inicio y remata con gigantes, dragones y erupciones de alto impacto.',
+    tone: 'furia',
+    mark: 'F2',
+  },
+  {
+    id: 'ARCANO_GLACIAL',
+    name: 'Dominio Glacial',
+    faction: 'Arcano',
+    commanderFaction: 'ARCANO',
+    archetype: 'Control',
+    description: 'Congela amenazas, protege el tablero y gana tiempo hasta dominar el santuario.',
+    tone: 'arcano',
+    mark: 'A1',
+  },
+  {
+    id: 'ARCANO_ESTELAR',
+    name: 'Nexus Estelar',
+    faction: 'Arcano',
+    commanderFaction: 'ARCANO',
+    archetype: 'Hechizos',
+    description: 'Robo de cartas, estructuras arcanas y hechizos cosmicos con gran alcance.',
+    tone: 'arcano',
+    mark: 'A2',
+  },
+  {
+    id: 'NATURALEZA_RAICES',
+    name: 'Raices Salvajes',
+    faction: 'Naturaleza',
+    commanderFaction: 'FURIA',
+    archetype: 'Bestias',
+    description: 'Centauros, faunos y bestias flexibles que se mueven bien por el tablero.',
+    tone: 'naturaleza',
+    mark: 'N1',
+  },
+  {
+    id: 'NATURALEZA_GUARDIANES',
+    name: 'Guardianes del Bosque',
+    faction: 'Naturaleza',
+    commanderFaction: 'FURIA',
+    archetype: 'Crecimiento',
+    description: 'Totems, curacion y criaturas resistentes para ganar por presencia estable.',
+    tone: 'naturaleza',
+    mark: 'N2',
+  },
+  {
+    id: 'ORDEN_ALBA',
+    name: 'Legion del Alba',
+    faction: 'Orden',
+    commanderFaction: 'ARCANO',
+    archetype: 'Aereo',
+    description: 'Grifos, pegasos y luz sagrada para jugar limpio, movil y contundente.',
+    tone: 'orden',
+    mark: 'O1',
+  },
+  {
+    id: 'ORDEN_BASTION',
+    name: 'Bastion Dorado',
+    faction: 'Orden',
+    commanderFaction: 'ARCANO',
+    archetype: 'Defensa',
+    description: 'Clerigos, guardianes y estructuras que protegen hasta imponer ventaja.',
+    tone: 'orden',
+    mark: 'O2',
+  },
+  {
+    id: 'SOMBRA_CRIPTA',
+    name: 'Cripta Maldita',
+    faction: 'Sombra',
+    commanderFaction: 'ARCANO',
+    archetype: 'Desgaste',
+    description: 'No-muertos, espectros y estructuras oscuras para desgastar al rival.',
+    tone: 'sombra',
+    mark: 'S1',
+  },
+  {
+    id: 'SOMBRA_NOBLEZA',
+    name: 'Pacto de Sangre',
+    faction: 'Sombra',
+    commanderFaction: 'ARCANO',
+    archetype: 'Ataque',
+    description: 'Vampiros, demonios y pesadillas para presionar con amenazas duras.',
+    tone: 'sombra',
+    mark: 'S2',
+  },
+  {
+    id: 'VACIO_ABISMO',
+    name: 'Abismo Astral',
+    faction: 'Vacio',
+    commanderFaction: 'ARCANO',
+    archetype: 'Cosmico',
+    description: 'Horrores del Vacio apoyados por magia estelar y control arcano.',
+    tone: 'vacio',
+    mark: 'V1',
+  },
+  {
+    id: 'VACIO_ENTROPIA',
+    name: 'Entropia Silenciosa',
+    faction: 'Vacio',
+    commanderFaction: 'ARCANO',
+    archetype: 'Late game',
+    description: 'Plan lento y poderoso con leviatanes, devoradores y aniquilacion.',
+    tone: 'vacio',
+    mark: 'V2',
+  },
 ];
 
 export function getDeckDefinition(deckId: DeckId): DeckDefinition {
