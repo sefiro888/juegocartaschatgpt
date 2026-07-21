@@ -224,9 +224,10 @@ interface CrystalLightProps {
   position: WorldPoint;
   phase: number;
   intensity?: number;
+  reduced?: boolean;
 }
 
-const CrystalLight: React.FC<CrystalLightProps> = ({ position, phase, intensity = 1 }) => {
+const CrystalLight: React.FC<CrystalLightProps> = ({ position, phase, intensity = 1, reduced = false }) => {
   const lightRef = useRef<THREE.PointLight>(null);
 
   useFrame((state) => {
@@ -237,12 +238,12 @@ const CrystalLight: React.FC<CrystalLightProps> = ({ position, phase, intensity 
   return (
     <group position={position}>
       <pointLight ref={lightRef} color="#57c9ff" intensity={intensity} distance={6} decay={2} />
-      <Sparkles count={5} scale={[1.1, 2.1, 1.1]} size={1.8} speed={0.22} color="#b9efff" opacity={0.6} />
+      <Sparkles count={reduced ? 2 : 5} scale={[1.1, 2.1, 1.1]} size={1.8} speed={0.22} color="#b9efff" opacity={0.6} />
     </group>
   );
 };
 
-const PortalVortex: React.FC = () => {
+const PortalVortex: React.FC<{ reduced?: boolean }> = ({ reduced = false }) => {
   const materialRef = useRef<THREE.ShaderMaterial>(null);
   const haloRef = useRef<THREE.Group>(null);
   const uniforms = useMemo(() => ({ uTime: { value: 0 } }), []);
@@ -283,7 +284,7 @@ const PortalVortex: React.FC = () => {
         </mesh>
       </group>
       <pointLight position={[0, 0, 1.1]} color="#46bdff" intensity={4.2} distance={8.5} decay={2} />
-      <Sparkles count={18} scale={[2.5, 4.8, 1.4]} size={2.1} speed={0.35} color="#bdefff" opacity={0.72} />
+      <Sparkles count={reduced ? 7 : 18} scale={[2.5, 4.8, 1.4]} size={2.1} speed={0.35} color="#bdefff" opacity={0.72} />
     </group>
   );
 };
@@ -345,7 +346,7 @@ const DistantCitadel: React.FC<DistantCitadelProps> = ({
   </group>
 );
 
-const SanctuaryModel: React.FC = () => {
+const SanctuaryModel: React.FC<{ reduced?: boolean }> = ({ reduced = false }) => {
   const gltf = useGLTF(MODEL_URL, false, true);
   const model = useMemo(() => {
     const clone = gltf.scene.clone(true);
@@ -361,14 +362,14 @@ const SanctuaryModel: React.FC = () => {
   useEffect(() => {
     model.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
-      child.castShadow = !child.name.includes('Rune');
+      child.castShadow = !reduced && !child.name.includes('Rune');
       child.receiveShadow = true;
 
       const materials = Array.isArray(child.material) ? child.material : [child.material];
       for (const material of materials) {
         if (!(material instanceof THREE.MeshStandardMaterial)) continue;
         if (material.map) {
-          material.map.anisotropy = 8;
+          material.map.anisotropy = reduced ? 4 : 8;
           material.map.colorSpace = THREE.SRGBColorSpace;
         }
         if (material.name.includes('StoneLight')) {
@@ -391,7 +392,7 @@ const SanctuaryModel: React.FC = () => {
         materials.forEach((material) => material.dispose());
       });
     };
-  }, [model]);
+  }, [model, reduced]);
 
   return <primitive object={model} />;
 };
@@ -422,7 +423,7 @@ const CLOUD_SPRITES: Array<{
   { position: [33, 6.2, -36], scale: [22, 9.4], opacity: 0.15, rotation: 0.07 },
 ];
 
-const CloudLayer: React.FC = () => {
+const CloudLayer: React.FC<{ reduced?: boolean }> = ({ reduced = false }) => {
   const nearCloudsRef = useRef<THREE.Group>(null);
   const farCloudsRef = useRef<THREE.Group>(null);
   const cloudTexture = useTexture(CLOUD_TEXTURE_URL);
@@ -481,8 +482,12 @@ const CloudLayer: React.FC = () => {
 
   return (
     <>
-      <group ref={nearCloudsRef} renderOrder={-2}>{CLOUD_SPRITES.slice(0, 10).map(renderCloud)}</group>
-      <group ref={farCloudsRef} renderOrder={-3}>{CLOUD_SPRITES.slice(10).map((cloud, index) => renderCloud(cloud, index + 10))}</group>
+      <group ref={nearCloudsRef} renderOrder={-2}>
+        {CLOUD_SPRITES.slice(0, reduced ? 6 : 10).map(renderCloud)}
+      </group>
+      <group ref={farCloudsRef} renderOrder={-3}>
+        {CLOUD_SPRITES.slice(10, reduced ? 14 : undefined).map((cloud, index) => renderCloud(cloud, index + 10))}
+      </group>
     </>
   );
 };
@@ -507,8 +512,13 @@ const WeatherLighting: React.FC = () => {
   );
 };
 
-export const FloatingSanctuary: React.FC = () => {
+interface FloatingSanctuaryProps {
+  quality?: 'full' | 'reduced';
+}
+
+export const FloatingSanctuary: React.FC<FloatingSanctuaryProps> = ({ quality = 'full' }) => {
   const debugMode = getSanctuaryDebugMode();
+  const reduced = quality === 'reduced';
   const showFullScene = debugMode === null;
   const showModel = showFullScene || debugMode === 'model';
   const showEnvironment = showFullScene || debugMode === 'environment';
@@ -527,9 +537,9 @@ export const FloatingSanctuary: React.FC = () => {
       position={[15, 22, 11]}
       color="#ffd6a0"
       intensity={2.85}
-      castShadow={showFullScene}
-      shadow-mapSize-width={1024}
-      shadow-mapSize-height={1024}
+      castShadow={showFullScene && !reduced}
+      shadow-mapSize-width={reduced ? 512 : 1024}
+      shadow-mapSize-height={reduced ? 512 : 1024}
       shadow-camera-left={-15}
       shadow-camera-right={15}
       shadow-camera-top={14}
@@ -543,32 +553,32 @@ export const FloatingSanctuary: React.FC = () => {
     <directionalLight position={[-13, 10, -15]} color="#86c9f1" intensity={0.86} />
     {showEnvironment && <WeatherLighting />}
 
-    {showClouds && <CloudLayer />}
+    {showClouds && <CloudLayer reduced={reduced} />}
     {showFullScene && (
       <>
         <DistantCitadel position={[-18, -4.6, -30]} scale={1.05} rotationY={0.28} />
-        <DistantCitadel position={[-8, -5.2, -35]} scale={0.78} rotationY={-0.34} broken />
         <DistantCitadel position={[11, -5, -36]} scale={0.88} rotationY={0.2} />
-        <DistantCitadel position={[20, -4.5, -29]} scale={1.08} rotationY={-0.22} broken />
+        {!reduced && <DistantCitadel position={[-8, -5.2, -35]} scale={0.78} rotationY={-0.34} broken />}
+        {!reduced && <DistantCitadel position={[20, -4.5, -29]} scale={1.08} rotationY={-0.22} broken />}
       </>
     )}
 
-    {showModel && <SanctuaryModel />}
-    {showFullScene && <PortalVortex />}
-    {showFullScene && <SanctuarySpectators />}
+    {showModel && <SanctuaryModel reduced={reduced} />}
+    {showFullScene && <PortalVortex reduced={reduced} />}
+    {showFullScene && !reduced && <SanctuarySpectators />}
 
     {showFullScene && (
       <>
-        <CrystalLight position={[-9.35, 1.7, -4.85]} phase={0.4} intensity={2.1} />
-        <CrystalLight position={[-9.15, 1.45, 7.9]} phase={1.8} intensity={2.2} />
-        <CrystalLight position={[8.85, 2.15, -5.25]} phase={3.1} intensity={2.35} />
-        <CrystalLight position={[9.65, 1.45, 3.6]} phase={4.6} intensity={1.8} />
+        <CrystalLight position={[-9.35, 1.7, -4.85]} phase={0.4} intensity={2.1} reduced={reduced} />
+        <CrystalLight position={[-9.15, 1.45, 7.9]} phase={1.8} intensity={2.2} reduced={reduced} />
+        <CrystalLight position={[8.85, 2.15, -5.25]} phase={3.1} intensity={2.35} reduced={reduced} />
+        <CrystalLight position={[9.65, 1.45, 3.6]} phase={4.6} intensity={1.8} reduced={reduced} />
       </>
     )}
 
     {showFullScene && (
       <Sparkles
-        count={24}
+        count={reduced ? 10 : 24}
         scale={[27, 7, 23]}
         position={[0, 2.6, -2]}
         size={1.15}

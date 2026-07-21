@@ -3,6 +3,9 @@ import { z } from 'zod';
 export const FactionSchema = z.enum(['FURIA', 'ARCANO', 'NATURALEZA', 'ORDEN', 'SOMBRA', 'VACIO']);
 export type Faction = z.infer<typeof FactionSchema>;
 
+export const ManaTypeSchema = z.enum(['furia', 'arcano', 'naturaleza', 'orden', 'sombra', 'vacio']);
+export type ManaType = z.infer<typeof ManaTypeSchema>;
+
 export const CardTypeSchema = z.enum(['MANA', 'UNIDAD', 'ESTRUCTURA', 'HECHIZO', 'COMANDANTE']);
 export type CardType = z.infer<typeof CardTypeSchema>;
 
@@ -13,6 +16,10 @@ export const CardCostSchema = z.object({
   generic: z.number().min(0),
   furia: z.number().min(0).optional(),
   arcano: z.number().min(0).optional(),
+  naturaleza: z.number().min(0).optional(),
+  orden: z.number().min(0).optional(),
+  sombra: z.number().min(0).optional(),
+  vacio: z.number().min(0).optional(),
 });
 export type CardCost = z.infer<typeof CardCostSchema>;
 
@@ -58,16 +65,28 @@ export const BoardEntitySchema = z.object({
 });
 export type BoardEntity = z.infer<typeof BoardEntitySchema>;
 
+export const ManaPoolSchema = z.object({
+  total: z.number().min(0),
+  spent: z.number().min(0),
+});
+
+export const ManaSourcesSchema = z.object({
+  furia: ManaPoolSchema,
+  arcano: ManaPoolSchema,
+  naturaleza: ManaPoolSchema,
+  orden: ManaPoolSchema,
+  sombra: ManaPoolSchema,
+  vacio: ManaPoolSchema,
+});
+export type ManaSources = z.infer<typeof ManaSourcesSchema>;
+
 export const PlayerStateSchema = z.object({
   id: z.enum(['PLAYER', 'OPPONENT']),
   nexusHealth: z.number(),
   hand: z.array(CardSchema),
   deck: z.array(CardSchema),
   graveyard: z.array(CardSchema),
-  manaSources: z.object({
-    furia: z.object({ total: z.number(), spent: z.number() }),
-    arcano: z.object({ total: z.number(), spent: z.number() }),
-  }),
+  manaSources: ManaSourcesSchema,
   manaPlayedThisTurn: z.boolean(),
   commander: CardSchema,
   commanderInPlay: z.boolean(),

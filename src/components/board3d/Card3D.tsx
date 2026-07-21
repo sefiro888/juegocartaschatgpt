@@ -1,4 +1,5 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
+import { Gem, Shield, Sword } from 'lucide-react';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
@@ -12,6 +13,8 @@ import {
   type WorldPoint,
 } from '../../core/boardVisualLayout';
 import { resolvePublicAsset } from '../../core/publicAssets';
+import { getFactionVisual } from '../../core/factionVisuals';
+import { getCardFactionCosts, manaTypeToFaction } from '../../core/factionRules';
 
 interface Card3DProps {
   entity: BoardEntity;
@@ -196,6 +199,7 @@ export const Card3D: React.FC<Card3DProps> = ({
   const isOpponent = entity.controller === 'OPPONENT';
   const isLegendaria = cardData.rarity === 'LEGENDARIA';
   const isEpica = cardData.rarity === 'EPICA';
+  const factionVisual = getFactionVisual(cardData.faction);
 
   // Rarity color tags
   const getRarityBorderColor = (rarity: string) => {
@@ -210,6 +214,7 @@ export const Card3D: React.FC<Card3DProps> = ({
 
   const isStructure = cardData.type === 'ESTRUCTURA';
   const hasStats = cardData.type === 'UNIDAD' || cardData.type === 'COMANDANTE' || isStructure;
+  const factionCosts = getCardFactionCosts(cardData);
 
   return (
     <group
@@ -266,7 +271,7 @@ export const Card3D: React.FC<Card3DProps> = ({
         <mesh position={[0, 0.72, -0.08]}>
           <cylinderGeometry args={[0.46, 0.68, 1.5, 28, 1, true]} />
           <meshBasicMaterial
-            color={cardData.faction === 'FURIA' ? '#ffb36b' : '#8bddff'}
+            color={factionVisual.softAccent}
             transparent
             opacity={0.055}
             side={THREE.DoubleSide}
@@ -319,7 +324,7 @@ export const Card3D: React.FC<Card3DProps> = ({
             data-logical-position={`${logicalX},${logicalY}`}
             className={[
               'card3d-face',
-              isHidden ? 'hidden-fog' : cardData.faction.toLowerCase(),
+              isHidden ? 'hidden-fog' : factionVisual.className,
               isSelected ? 'selected' : '',
               isHovered ? 'hovered' : '',
               (isLegendaria && !isHidden) ? 'rarity-legendaria' : '',
@@ -335,6 +340,34 @@ export const Card3D: React.FC<Card3DProps> = ({
             {/* Header nameplate */}
             <div className="card3d-header">
               <span className="card3d-name">{isHidden ? 'Criatura Oculta' : cardData.name}</span>
+            </div>
+
+            <div
+              className="card3d-cost"
+              style={{
+                display: !isHidden && cardData.type !== 'MANA' ? 'flex' : 'none',
+                '--mana-accent': factionVisual.accent,
+              } as React.CSSProperties}
+            >
+              <span className="card3d-generic" style={{ display: cardData.cost.generic > 0 ? 'flex' : 'none' }}>
+                <Gem aria-hidden="true" />
+                {cardData.cost.generic}
+              </span>
+              {factionCosts.map(({ manaType, amount }) => {
+                const visual = getFactionVisual(manaTypeToFaction(manaType));
+                return (
+                  <span
+                    key={manaType}
+                    className="card3d-faction-cost"
+                    style={{
+                      color: visual.softAccent,
+                      '--segment-accent': visual.accent,
+                    } as React.CSSProperties}
+                  >
+                    <i>{visual.icon}</i>{amount}
+                  </span>
+                );
+              })}
             </div>
 
             {/* Framed Art illustration */}
@@ -355,17 +388,19 @@ export const Card3D: React.FC<Card3DProps> = ({
 
             {/* Back watermark icon */}
             <div className="card3d-watermark">
-              {isHidden ? '👁️' : cardData.faction === 'FURIA' ? '🔥' : '❄️'}
+              {isHidden ? '?' : factionVisual.icon}
             </div>
 
             {/* Runic Stat medals (Static rendering, toggle display property to avoid DOM node addition/removal crashes) */}
             <div className="card3d-stats" style={{ display: hasStats && !isHidden ? 'flex' : 'none' }}>
               <div className="stat3d-badge att" style={{ display: !isStructure ? 'flex' : 'none' }}>
                 <span className="badge-ring" />
+                <Sword className="stat3d-icon" aria-hidden="true" />
                 <span className="val">{entity.attack}</span>
               </div>
               <div className="stat3d-badge hp">
                 <span className="badge-ring" />
+                <Shield className="stat3d-icon" aria-hidden="true" />
                 <span className="val">{entity.health}</span>
               </div>
             </div>
@@ -420,6 +455,18 @@ export const Card3D: React.FC<Card3DProps> = ({
             .card3d-face.arcano {
               background: linear-gradient(to bottom, #071524, #03080e);
             }
+            .card3d-face.naturaleza {
+              background: linear-gradient(to bottom, #0b1d13, #041008);
+            }
+            .card3d-face.orden {
+              background: linear-gradient(to bottom, #211b0d, #0d0c08);
+            }
+            .card3d-face.sombra {
+              background: linear-gradient(to bottom, #170d22, #09050f);
+            }
+            .card3d-face.vacio {
+              background: linear-gradient(to bottom, #150b24, #06030c);
+            }
             
             /* Inner gold/silver frame decoration */
             .card3d-border-inlay {
@@ -443,7 +490,8 @@ export const Card3D: React.FC<Card3DProps> = ({
             }
 
             .card3d-header {
-              padding: 5px 8px;
+              min-height: 27px;
+              padding: 5px 43px 5px 8px;
               background: linear-gradient(90deg, rgba(255,255,255,0.01) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.01) 100%);
               border-bottom: 1px solid rgba(255,255,255,0.1);
               display: flex;
@@ -462,6 +510,56 @@ export const Card3D: React.FC<Card3DProps> = ({
               overflow: hidden;
               text-overflow: ellipsis;
               text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+            }
+
+            .card3d-cost {
+              position: absolute;
+              top: 5px;
+              right: 6px;
+              z-index: 20;
+              min-height: 24px;
+              align-items: center;
+              gap: 1px;
+              padding: 2px;
+              overflow: hidden;
+              border: 1px solid color-mix(in srgb, var(--mana-accent) 62%, white 8%);
+              border-radius: 8px 8px 10px 10px;
+              background: linear-gradient(145deg, rgba(255,255,255,0.15), transparent 42%), #10141d;
+              box-shadow: 0 3px 7px rgba(0,0,0,0.75), 0 0 7px color-mix(in srgb, var(--mana-accent) 32%, transparent);
+              font-size: 0.55rem;
+              font-weight: 900;
+            }
+
+            .card3d-generic,
+            .card3d-faction-cost {
+              min-width: 18px;
+              height: 18px;
+              align-items: center;
+              justify-content: center;
+              gap: 1px;
+              border-radius: 5px;
+              background: rgba(255,255,255,0.08);
+            }
+
+            .card3d-generic svg {
+              width: 7px;
+              height: 7px;
+            }
+
+            .card3d-faction-cost {
+              background: color-mix(in srgb, var(--segment-accent) 25%, #10141d);
+            }
+
+            .card3d-faction-cost i {
+              display: grid;
+              width: 9px;
+              height: 9px;
+              place-items: center;
+              border: 1px solid currentColor;
+              border-radius: 50%;
+              font-size: 0.32rem;
+              font-style: normal;
+              line-height: 1;
             }
 
             /* Framed Art Window */
@@ -515,25 +613,30 @@ export const Card3D: React.FC<Card3DProps> = ({
             }
 
             .stat3d-badge {
-              background: rgba(10, 10, 15, 0.85);
-              width: 25px;
-              height: 25px;
-              border-radius: 50%;
+              width: 31px;
+              height: 28px;
+              border-radius: 8px 8px 10px 10px;
               display: flex;
               align-items: center;
               justify-content: center;
-              font-size: 0.72rem;
+              gap: 2px;
+              font-size: 0.76rem;
               font-weight: 900;
               position: relative;
               box-shadow: 0 3px 6px rgba(0,0,0,0.7);
-              border: 1.5px solid;
+              border: 1px solid;
             }
             
             .badge-ring {
               position: absolute;
-              inset: 1px;
-              border: 1px dashed rgba(255,255,255,0.25);
-              border-radius: 50%;
+              inset: 2px;
+              border: 1px solid rgba(255,255,255,0.12);
+              border-radius: 6px 6px 8px 8px;
+            }
+            .stat3d-icon {
+              width: 9px;
+              height: 9px;
+              z-index: 1;
             }
             .val {
               z-index: 1;
@@ -541,14 +644,17 @@ export const Card3D: React.FC<Card3DProps> = ({
             }
 
             .stat3d-badge.att {
-              background: radial-gradient(circle at 35% 30%, #991b1b, #450a0a);
-              color: #fecaca;
-              border-color: #ef4444;
+              background: linear-gradient(145deg, #b52b2b, #651515 52%, #260707);
+              color: #fff2ed;
+              border-color: #ff6b4a;
+              box-shadow: 0 0 7px rgba(255,74,50,0.44), 0 3px 6px rgba(0,0,0,0.7);
             }
             .stat3d-badge.hp {
-              background: radial-gradient(circle at 35% 30%, #065f46, #022c22);
-              color: #a7f3d0;
-              border-color: #10b981;
+              margin-left: auto;
+              background: linear-gradient(145deg, #16865f, #07523e 52%, #02251d);
+              color: #eafff6;
+              border-color: #42e2aa;
+              box-shadow: 0 0 7px rgba(46,218,157,0.4), 0 3px 6px rgba(0,0,0,0.7);
             }
 
             .frozen-overlay {

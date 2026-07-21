@@ -80,7 +80,12 @@ export async function saveOnlineMatchState(
   const client = requireClient();
   const { data, error } = await client
     .from('online_matches')
-    .update({ game_state: gameState, revision: revision + 1, updated_at: new Date().toISOString() })
+    .update({
+      game_state: gameState,
+      revision: revision + 1,
+      status: gameState.winner ? 'finished' : 'active',
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', matchId)
     .eq('revision', revision)
     .select()

@@ -1,5 +1,6 @@
-import type { Card, Faction } from '../types/card';
+import type { Card, Faction, ManaType } from '../types/card';
 import type { DeckId } from './deckCatalog';
+import { MANA_SOURCE_CARD_IDS, MANA_TYPES, factionToManaType } from './factionRules';
 
 export const CARDS_DB: Record<string, Card> = {
   // --- FURIA (20 cartas, IDs 1-12, 25-32) ---
@@ -800,7 +801,7 @@ export const CARDS_DB: Record<string, Card> = {
     rulesText: 'Resistencia (Reduce en 1 el daño recibido).',
     flavorText: 'Su plegaria no pide que desaparezca la oscuridad, sino que nadie tenga que atravesarla solo.',
     attack: 3,
-    maxHealth: 5,
+    maxHealth: 4,
     cardNumber: 44,
     artPath: '/assets/cards/art/clerigo-luz.webp',
     range: 1,
@@ -913,7 +914,7 @@ export const CARDS_DB: Record<string, Card> = {
     rarity: 'RARA',
     rulesText: 'Vuelo (Puede saltar obstáculos).',
     flavorText: 'Desde sus alas, las fronteras parecen líneas dibujadas sobre la tierra. Su deber es vigilar todas.',
-    attack: 4,
+    attack: 3,
     maxHealth: 4,
     cardNumber: 50,
     artPath: '/assets/cards/art/grifo-orden.webp',
@@ -1110,14 +1111,14 @@ export const CARDS_DB: Record<string, Card> = {
   },
   'golem-piedra': {
     id: 'golem-piedra',
-    name: 'GÃ³lem de Piedra',
+    name: 'Gólem de Piedra',
     faction: 'ARCANO',
     type: 'UNIDAD',
-    subtype: 'GÃ³lem',
+    subtype: 'Gólem',
     cost: { generic: 4, arcano: 1 },
     rarity: 'RARA',
-    rulesText: 'Resistencia (Reduce en 1 el daÃ±o recibido).',
-    flavorText: 'Fue tallado en una montaÃ±a que ya no existe. Cada paso suyo recuerda al valle que jurÃ³ proteger.',
+    rulesText: 'Resistencia (Reduce en 1 el daño recibido).',
+    flavorText: 'Fue tallado en una montaña que ya no existe. Cada paso suyo recuerda al valle que juró proteger.',
     attack: 3,
     maxHealth: 6,
     cardNumber: 61,
@@ -1125,7 +1126,7 @@ export const CARDS_DB: Record<string, Card> = {
     range: 1,
     movement: 1,
     artist: 'Archivo del Nexo',
-    artistStyle: 'Piedra rÃºnica'
+    artistStyle: 'Piedra rúnica'
   },
   'minotauro-brasa': {
     id: 'minotauro-brasa',
@@ -1136,7 +1137,7 @@ export const CARDS_DB: Record<string, Card> = {
     cost: { generic: 4, furia: 1 },
     rarity: 'RARA',
     rulesText: 'Carga (Puede moverse y atacar inmediatamente al ser invocado).',
-    flavorText: 'No embiste porque estÃ© furioso. Embiste porque el mundo aÃºn sigue en pie.',
+    flavorText: 'No embiste porque esté furioso. Embiste porque el mundo aún sigue en pie.',
     attack: 5,
     maxHealth: 4,
     cardNumber: 62,
@@ -1144,7 +1145,7 @@ export const CARDS_DB: Record<string, Card> = {
     range: 1,
     movement: 1,
     artist: 'Archivo del Nexo',
-    artistStyle: 'FantasÃ­a volcÃ¡nica'
+    artistStyle: 'Fantasía volcánica'
   },
   'cacique-orco': {
     id: 'cacique-orco',
@@ -1163,7 +1164,7 @@ export const CARDS_DB: Record<string, Card> = {
     range: 1,
     movement: 1,
     artist: 'Archivo del Nexo',
-    artistStyle: 'Guerra de fantasÃ­a'
+    artistStyle: 'Guerra de fantasía'
   },
   'horca-renegada': {
     id: 'horca-renegada',
@@ -1174,14 +1175,14 @@ export const CARDS_DB: Record<string, Card> = {
     cost: { generic: 3 },
     rarity: 'RARA',
     rulesText: 'Las unidades enemigas adyacentes tienen -1 de movimiento.',
-    flavorText: 'Nadie recuerda quiÃ©n la construyÃ³. Lo inquietante es que cada amanecer aparece una cuerda nueva.',
+    flavorText: 'Nadie recuerda quién la construyó. Lo inquietante es que cada amanecer aparece una cuerda nueva.',
     maxHealth: 4,
     cardNumber: 64,
     artPath: '/assets/cards/art/horca-renegada.png',
     range: 1,
     movement: 0,
     artist: 'Archivo del Nexo',
-    artistStyle: 'GÃ³tico sombrÃ­o'
+    artistStyle: 'Gótico sombrío'
   },
   'tumba-olvidada': {
     id: 'tumba-olvidada',
@@ -1192,7 +1193,7 @@ export const CARDS_DB: Record<string, Card> = {
     cost: { generic: 4 },
     rarity: 'RARA',
     rulesText: 'Al comienzo de tu turno, cura 1 de salud a una unidad de Sombra aliada.',
-    flavorText: 'Sus puertas no se abren hacia dentro, sino hacia todos los nombres que el mundo prefiriÃ³ enterrar.',
+    flavorText: 'Sus puertas no se abren hacia dentro, sino hacia todos los nombres que el mundo prefirió enterrar.',
     maxHealth: 5,
     cardNumber: 65,
     artPath: '/assets/cards/art/tumba-olvidada.png',
@@ -1209,7 +1210,7 @@ export const CARDS_DB: Record<string, Card> = {
     subtype: 'No-muerto',
     cost: { generic: 3 },
     rarity: 'COMUN',
-    rulesText: 'Ãšltimo Aliento: Inflige 1 de daÃ±o a las unidades adyacentes.',
+    rulesText: 'Último Aliento: Inflige 1 de daño a las unidades adyacentes.',
     flavorText: 'La plaga no lo mantiene vivo. Solo impide que la muerte termine su trabajo.',
     attack: 2,
     maxHealth: 4,
@@ -1218,7 +1219,7 @@ export const CARDS_DB: Record<string, Card> = {
     range: 1,
     movement: 1,
     artist: 'Archivo del Nexo',
-    artistStyle: 'Horror gÃ³tico'
+    artistStyle: 'Horror gótico'
   },
   'vampiro-noble': {
     id: 'vampiro-noble',
@@ -1228,8 +1229,8 @@ export const CARDS_DB: Record<string, Card> = {
     subtype: 'Vampiro',
     cost: { generic: 4 },
     rarity: 'RARA',
-    rulesText: 'Al daÃ±ar una unidad, cura 1 de salud a esta unidad.',
-    flavorText: 'Su cortesÃ­a es impecable. Por eso sus vÃ­ctimas tardan tanto en comprender que ya han sido invitadas a morir.',
+    rulesText: 'Al dañar una unidad, cura 1 de salud a esta unidad.',
+    flavorText: 'Su cortesía es impecable. Por eso sus víctimas tardan tanto en comprender que ya han sido invitadas a morir.',
     attack: 3,
     maxHealth: 4,
     cardNumber: 67,
@@ -1247,7 +1248,7 @@ export const CARDS_DB: Record<string, Card> = {
     subtype: 'Espora',
     cost: { generic: 2 },
     rarity: 'COMUN',
-    rulesText: 'Inflige 2 puntos de daÃ±o a una unidad seleccionada.',
+    rulesText: 'Inflige 2 puntos de daño a una unidad seleccionada.',
     flavorText: 'El bosque no siempre ruge. A veces basta con respirar en el lugar equivocado.',
     cardNumber: 68,
     artPath: '/assets/cards/art/espora-venenosa.png',
@@ -1258,13 +1259,13 @@ export const CARDS_DB: Record<string, Card> = {
   },
   'totem-naturaleza': {
     id: 'totem-naturaleza',
-    name: 'TÃ³tem de Naturaleza',
+    name: 'Tótem de Naturaleza',
     faction: 'NATURALEZA',
     type: 'ESTRUCTURA',
-    subtype: 'TÃ³tem',
+    subtype: 'Tótem',
     cost: { generic: 3 },
     rarity: 'RARA',
-    rulesText: 'Tus unidades adyacentes ganan +1 de vida mÃ¡xima.',
+    rulesText: 'Tus unidades adyacentes ganan +1 de vida máxima.',
     flavorText: 'Sus runas no fueron escritas: crecieron lentamente bajo la corteza hasta aprender a brillar.',
     maxHealth: 4,
     cardNumber: 69,
@@ -1272,7 +1273,7 @@ export const CARDS_DB: Record<string, Card> = {
     range: 1,
     movement: 0,
     artist: 'Archivo del Nexo',
-    artistStyle: 'Naturaleza rÃºnica'
+    artistStyle: 'Naturaleza rúnica'
   },
   'centauro-guerrero': {
     id: 'centauro-guerrero',
@@ -1283,7 +1284,7 @@ export const CARDS_DB: Record<string, Card> = {
     cost: { generic: 3 },
     rarity: 'COMUN',
     rulesText: 'Movimiento Diagonal: Puede desplazarse y atacar diagonalmente.',
-    flavorText: 'Donde otros ven maleza, Ã©l ve avenidas de guerra abiertas por el viento.',
+    flavorText: 'Donde otros ven maleza, él ve avenidas de guerra abiertas por el viento.',
     attack: 3,
     maxHealth: 3,
     cardNumber: 70,
@@ -1302,7 +1303,7 @@ export const CARDS_DB: Record<string, Card> = {
     cost: { generic: 2 },
     rarity: 'COMUN',
     rulesText: 'Grito de Batalla: Cura 1 de salud a una unidad aliada adyacente.',
-    flavorText: 'Su melodÃ­a hace que las setas despierten y que las heridas recuerden cÃ³mo cerrarse.',
+    flavorText: 'Su melodía hace que las setas despierten y que las heridas recuerden cómo cerrarse.',
     attack: 1,
     maxHealth: 3,
     cardNumber: 71,
@@ -1310,7 +1311,7 @@ export const CARDS_DB: Record<string, Card> = {
     range: 1,
     movement: 1,
     artist: 'Archivo del Nexo',
-    artistStyle: 'FantasÃ­a forestal'
+    artistStyle: 'Fantasía forestal'
   },
   'obelisco-estelar': {
     id: 'obelisco-estelar',
@@ -1356,7 +1357,7 @@ export const CARDS_DB: Record<string, Card> = {
     subtype: 'Obstáculo',
     cost: { generic: 99 },
     rarity: 'COMUN',
-    rulesText: 'Bloquea el paso. Puede destruirse para abrir una ruta.',
+    rulesText: 'Bloquea el paso y la vision. Al destruirlo, roba 1 carta.',
     flavorText: '«Un monolito erigido en el centro del Nexo que canaliza energías magnéticas.»',
     maxHealth: 4,
     cardNumber: 0,
@@ -1374,7 +1375,7 @@ export const CARDS_DB: Record<string, Card> = {
     subtype: 'Obstáculo',
     cost: { generic: 99 },
     rarity: 'COMUN',
-    rulesText: 'Bloquea el paso. Puede destruirse para abrir una ruta.',
+    rulesText: 'Bloquea el paso. Da cobertura a unidades adyacentes contra ataques a distancia.',
     flavorText: 'Una cresta de piedra suspendida, erosionada por siglos de tormentas celestes.',
     maxHealth: 6,
     cardNumber: 0,
@@ -1392,7 +1393,7 @@ export const CARDS_DB: Record<string, Card> = {
     subtype: 'Obstáculo',
     cost: { generic: 99 },
     rarity: 'COMUN',
-    rulesText: 'Bloquea el paso. Puede disiparse con daño para abrir una ruta.',
+    rulesText: 'Bloquea el paso. Ralentiza unidades adyacentes. Al destruirla, recupera 1 mana gastado.',
     flavorText: 'Un cauce de energía viva que solo cede cuando su sello se fragmenta.',
     maxHealth: 3,
     cardNumber: 0,
@@ -1403,6 +1404,153 @@ export const CARDS_DB: Record<string, Card> = {
     artistStyle: 'Flujo Rúnico'
   }
 };
+
+Object.assign(CARDS_DB, {
+  'fuente-naturaleza': {
+    id: 'fuente-naturaleza',
+    name: 'Fuente de Naturaleza',
+    faction: 'NATURALEZA',
+    type: 'MANA',
+    subtype: 'Recurso de Vida',
+    cost: { generic: 0 },
+    rarity: 'COMUN',
+    rulesText: 'Genera 1 de mana de Naturaleza. Limite de una fuente jugada por turno.',
+    flavorText: 'Las raices del Nexo guardan fuerza incluso por encima de las nubes.',
+    cardNumber: 0,
+    artPath: '/assets/cards/art/totem-naturaleza.png',
+    range: 1,
+    movement: 0,
+    artist: 'Cronicas del Nexo',
+    artistStyle: 'Naturaleza runica',
+  },
+  'fuente-orden': {
+    id: 'fuente-orden',
+    name: 'Fuente de Orden',
+    faction: 'ORDEN',
+    type: 'MANA',
+    subtype: 'Recurso de Luz',
+    cost: { generic: 0 },
+    rarity: 'COMUN',
+    rulesText: 'Genera 1 de mana de Orden. Limite de una fuente jugada por turno.',
+    flavorText: 'Una promesa de luz convertida en disciplina y poder.',
+    cardNumber: 0,
+    artPath: '/assets/cards/art/grifo-orden.webp',
+    range: 1,
+    movement: 0,
+    artist: 'Cronicas del Nexo',
+    artistStyle: 'Fantasia celestial',
+  },
+  'fuente-sombra': {
+    id: 'fuente-sombra',
+    name: 'Fuente de Sombra',
+    faction: 'SOMBRA',
+    type: 'MANA',
+    subtype: 'Recurso Umbrio',
+    cost: { generic: 0 },
+    rarity: 'COMUN',
+    rulesText: 'Genera 1 de mana de Sombra. Limite de una fuente jugada por turno.',
+    flavorText: 'Cada secreto enterrado alimenta la oscuridad que aguarda bajo el santuario.',
+    cardNumber: 0,
+    artPath: '/assets/cards/art/tumba-olvidada.png',
+    range: 1,
+    movement: 0,
+    artist: 'Cronicas del Nexo',
+    artistStyle: 'Ruina encantada',
+  },
+  'fuente-vacio': {
+    id: 'fuente-vacio',
+    name: 'Fuente del Vacio',
+    faction: 'VACIO',
+    type: 'MANA',
+    subtype: 'Recurso Cosmico',
+    cost: { generic: 0 },
+    rarity: 'COMUN',
+    rulesText: 'Genera 1 de mana de Vacio. Limite de una fuente jugada por turno.',
+    flavorText: 'Donde termina la realidad comienza una corriente imposible de contener.',
+    cardNumber: 0,
+    artPath: '/assets/cards/art/obelisco-estelar.png',
+    range: 1,
+    movement: 0,
+    artist: 'Cronicas del Nexo',
+    artistStyle: 'Fantasia cosmica',
+  },
+  'comandante-naturaleza': {
+    id: 'comandante-naturaleza',
+    name: 'Elandra, Voz de las Raices',
+    faction: 'NATURALEZA',
+    type: 'COMANDANTE',
+    subtype: 'Guardiana ancestral',
+    cost: { generic: 0 },
+    rarity: 'LEGENDARIA',
+    rulesText: 'Comandante. Tus fuerzas prosperan alrededor del Nexo.',
+    flavorText: 'Mientras una raiz permanezca viva, el santuario no caera.',
+    attack: 2,
+    maxHealth: 25,
+    cardNumber: 0,
+    artPath: '/assets/cards/art/totem-naturaleza.png',
+    range: 1,
+    movement: 1,
+    artist: 'Cronicas del Nexo',
+    artistStyle: 'Naturaleza runica',
+  },
+  'comandante-orden': {
+    id: 'comandante-orden',
+    name: 'Aureon, Mariscal del Alba',
+    faction: 'ORDEN',
+    type: 'COMANDANTE',
+    subtype: 'Mariscal celestial',
+    cost: { generic: 0 },
+    rarity: 'LEGENDARIA',
+    rulesText: 'Comandante. La formacion es la primera defensa del Nexo.',
+    flavorText: 'Su estandarte permanece en pie cuando las torres empiezan a caer.',
+    attack: 2,
+    maxHealth: 25,
+    cardNumber: 0,
+    artPath: '/assets/cards/art/grifo-orden.webp',
+    range: 1,
+    movement: 1,
+    artist: 'Cronicas del Nexo',
+    artistStyle: 'Fantasia celestial',
+  },
+  'comandante-sombra': {
+    id: 'comandante-sombra',
+    name: 'Nocthar, Senor del Pacto',
+    faction: 'SOMBRA',
+    type: 'COMANDANTE',
+    subtype: 'Noble inmortal',
+    cost: { generic: 0 },
+    rarity: 'LEGENDARIA',
+    rulesText: 'Comandante. Cada perdida alimenta un juramento mas oscuro.',
+    flavorText: 'No necesita una corona cuando todos recuerdan su deuda.',
+    attack: 2,
+    maxHealth: 25,
+    cardNumber: 0,
+    artPath: '/assets/cards/art/vampiro-noble.png',
+    range: 1,
+    movement: 1,
+    artist: 'Cronicas del Nexo',
+    artistStyle: 'Nobleza oscura',
+  },
+  'comandante-vacio': {
+    id: 'comandante-vacio',
+    name: 'Orun, Heraldo de la Entropia',
+    faction: 'VACIO',
+    type: 'COMANDANTE',
+    subtype: 'Heraldo cosmico',
+    cost: { generic: 0 },
+    rarity: 'LEGENDARIA',
+    rulesText: 'Comandante. El campo se deforma alrededor de su voluntad.',
+    flavorText: 'Su llegada no hace ruido; es el mundo el que deja de responder.',
+    attack: 2,
+    maxHealth: 25,
+    cardNumber: 0,
+    artPath: '/assets/cards/art/devorador-entropico.webp',
+    range: 1,
+    movement: 1,
+    artist: 'Cronicas del Nexo',
+    artistStyle: 'Fantasia cosmica',
+  },
+} satisfies Record<string, Card>);
 
 // ═══════════════════════════════════════════════════
 // DYNAMIC SVG ILLUSTRATION GENERATOR FOR ALL 400 CARDS
@@ -1798,7 +1946,7 @@ function generateRemainingCards() {
       artPath = '/assets/cards/art/tumba-olvidada.png';
     } else if (name.includes('Cripta')) {
       artPath = '/assets/cards/art/cripta-mortal.webp';
-    } else if (name.includes('TÃ³tem') || name.includes('Totem')) {
+    } else if (name.includes('Tótem') || name.includes('Totem')) {
       artPath = '/assets/cards/art/totem-naturaleza.png';
     } else if (name.includes('Arboleda') || name.includes('Bosque')) {
       artPath = '/assets/cards/art/arboleda-sagrada.webp';
@@ -1891,8 +2039,36 @@ function generateRemainingCards() {
 // Generate the remaining 360 cards immediately
 generateRemainingCards();
 
+function applyFactionCosts() {
+  for (const card of Object.values(CARDS_DB)) {
+    if (card.type === 'MANA' || card.type === 'COMANDANTE' || card.cardNumber === 0) continue;
+
+    const manaType = factionToManaType(card.faction);
+    const coloredCost = MANA_TYPES.reduce((total, type) => total + (card.cost[type] ?? 0), 0);
+    const factionRequirement = coloredCost > 0 ? coloredCost : card.cost.generic > 0 ? 1 : 0;
+    const generic = coloredCost > 0 ? card.cost.generic : Math.max(0, card.cost.generic - factionRequirement);
+
+    card.cost = { generic, [manaType]: factionRequirement };
+  }
+}
+
+applyFactionCosts();
+
+const COMMANDER_CARD_IDS: Record<Faction, string> = {
+  FURIA: 'comandante-furia',
+  ARCANO: 'comandante-arcano',
+  NATURALEZA: 'comandante-naturaleza',
+  ORDEN: 'comandante-orden',
+  SOMBRA: 'comandante-sombra',
+  VACIO: 'comandante-vacio',
+};
+
+export function getCommanderForFaction(faction: Faction): Card {
+  return CARDS_DB[COMMANDER_CARD_IDS[faction]];
+}
+
 type DeckRecipeEntry = { id: string; count: number };
-type ManaPlan = { furia: number; arcano: number };
+type ManaPlan = Partial<Record<ManaType, number>>;
 type CuratedDeckRecipe = { mana: ManaPlan; cards: DeckRecipeEntry[] };
 
 const CURATED_DECK_RECIPES: Record<DeckId, CuratedDeckRecipe> = {
@@ -1900,17 +2076,17 @@ const CURATED_DECK_RECIPES: Record<DeckId, CuratedDeckRecipe> = {
     mana: { furia: 20, arcano: 0 },
     cards: [
       { id: 'sabueso-brasa', count: 4 },
-      { id: 'trasgo-piroclastico', count: 3 },
-      { id: 'guerrero-ceniza', count: 3 },
-      { id: 'orco-guerrero', count: 3 },
-      { id: 'berserker-ignivoro', count: 2 },
-      { id: 'minotauro-brasa', count: 2 },
-      { id: 'cacique-orco', count: 1 },
-      { id: 'chispa-fugaz', count: 3 },
+      { id: 'infiltrado-volcanico', count: 4 },
+      { id: 'guerrero-ceniza', count: 4 },
+      { id: 'orco-guerrero', count: 4 },
+      { id: 'berserker-ignivoro', count: 1 },
+      { id: 'minotauro-brasa', count: 4 },
+      { id: 'cacique-orco', count: 2 },
+      { id: 'draco-magma', count: 1 },
+      { id: 'chispa-fugaz', count: 1 },
       { id: 'lluvia-ceniza', count: 2 },
-      { id: 'impetu-fuego', count: 3 },
+      { id: 'impetu-fuego', count: 1 },
       { id: 'furia-nexo', count: 2 },
-      { id: 'forja-carmesi', count: 2 },
     ],
   },
   FURIA_CALDERA: {
@@ -1949,22 +2125,23 @@ const CURATED_DECK_RECIPES: Record<DeckId, CuratedDeckRecipe> = {
   ARCANO_ESTELAR: {
     mana: { furia: 0, arcano: 20 },
     cards: [
-      { id: 'aprendiz-nexo', count: 3 },
+      { id: 'aprendiz-nexo', count: 2 },
       { id: 'buho-runico', count: 3 },
-      { id: 'tejedora-tiempo', count: 3 },
-      { id: 'vortice-mana', count: 3 },
-      { id: 'cometa-arcano', count: 3 },
+      { id: 'tejedora-tiempo', count: 2 },
+      { id: 'vortice-mana', count: 1 },
+      { id: 'cometa-arcano', count: 4 },
       { id: 'tormenta-mana', count: 2 },
-      { id: 'biblioteca-runica', count: 3 },
+      { id: 'biblioteca-runica', count: 1 },
       { id: 'obelisco-estelar', count: 2 },
       { id: 'avatar-cosmos', count: 2 },
-      { id: 'elemental-tormenta', count: 2 },
-      { id: 'destello-runico', count: 2 },
-      { id: 'templo-runico', count: 2 },
+      { id: 'elemental-tormenta', count: 3 },
+      { id: 'centinela-cristal', count: 4 },
+      { id: 'mago-runa-helada', count: 3 },
+      { id: 'templo-runico', count: 1 },
     ],
   },
   NATURALEZA_RAICES: {
-    mana: { furia: 14, arcano: 6 },
+    mana: { naturaleza: 13, arcano: 7 },
     cards: [
       { id: 'fauno-bosque', count: 4 },
       { id: 'centauro-guerrero', count: 4 },
@@ -1978,7 +2155,7 @@ const CURATED_DECK_RECIPES: Record<DeckId, CuratedDeckRecipe> = {
     ],
   },
   NATURALEZA_GUARDIANES: {
-    mana: { furia: 12, arcano: 8 },
+    mana: { naturaleza: 10, arcano: 10 },
     cards: [
       { id: 'totem-naturaleza', count: 3 },
       { id: 'fauno-bosque', count: 3 },
@@ -1993,7 +2170,7 @@ const CURATED_DECK_RECIPES: Record<DeckId, CuratedDeckRecipe> = {
     ],
   },
   ORDEN_ALBA: {
-    mana: { furia: 4, arcano: 16 },
+    mana: { orden: 9, arcano: 11 },
     cards: [
       { id: 'pegaso-celestial', count: 4 },
       { id: 'grifo-orden', count: 4 },
@@ -2008,7 +2185,7 @@ const CURATED_DECK_RECIPES: Record<DeckId, CuratedDeckRecipe> = {
     ],
   },
   ORDEN_BASTION: {
-    mana: { furia: 6, arcano: 14 },
+    mana: { orden: 9, arcano: 11 },
     cards: [
       { id: 'clerigo-luz', count: 4 },
       { id: 'golem-runico', count: 3 },
@@ -2023,7 +2200,7 @@ const CURATED_DECK_RECIPES: Record<DeckId, CuratedDeckRecipe> = {
     ],
   },
   SOMBRA_CRIPTA: {
-    mana: { furia: 8, arcano: 12 },
+    mana: { sombra: 20 },
     cards: [
       { id: 'zombi-hambriento', count: 4 },
       { id: 'zombi-infectado', count: 4 },
@@ -2038,7 +2215,7 @@ const CURATED_DECK_RECIPES: Record<DeckId, CuratedDeckRecipe> = {
     ],
   },
   SOMBRA_NOBLEZA: {
-    mana: { furia: 10, arcano: 10 },
+    mana: { sombra: 20 },
     cards: [
       { id: 'vampiro-noble', count: 4 },
       { id: 'demonio-infernal', count: 3 },
@@ -2053,7 +2230,7 @@ const CURATED_DECK_RECIPES: Record<DeckId, CuratedDeckRecipe> = {
     ],
   },
   VACIO_ABISMO: {
-    mana: { furia: 4, arcano: 16 },
+    mana: { vacio: 5, naturaleza: 2, arcano: 13 },
     cards: [
       { id: 'parasito-vacio', count: 4 },
       { id: 'devorador-entropico', count: 2 },
@@ -2069,7 +2246,7 @@ const CURATED_DECK_RECIPES: Record<DeckId, CuratedDeckRecipe> = {
     ],
   },
   VACIO_ENTROPIA: {
-    mana: { furia: 6, arcano: 14 },
+    mana: { vacio: 6, naturaleza: 1, arcano: 13 },
     cards: [
       { id: 'devorador-entropico', count: 3 },
       { id: 'leviatan-abisal', count: 3 },
@@ -2128,8 +2305,10 @@ function buildCuratedDeck(deckId: DeckId): Card[] {
   const recipe = CURATED_DECK_RECIPES[deckId];
   const deck: Card[] = [];
 
-  addCards(deck, 'fuente-furia', recipe.mana.furia, deckId);
-  addCards(deck, 'fuente-arcana', recipe.mana.arcano, deckId);
+  for (const manaType of MANA_TYPES) {
+    const count = recipe.mana[manaType] ?? 0;
+    if (count > 0) addCards(deck, MANA_SOURCE_CARD_IDS[manaType], count, deckId);
+  }
   recipe.cards.forEach((entry) => addCards(deck, entry.id, entry.count, deckId));
 
   if (deck.length !== 50) {

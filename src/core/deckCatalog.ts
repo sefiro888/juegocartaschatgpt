@@ -1,3 +1,5 @@
+import type { Faction } from '../types/card';
+
 export type DeckTone = 'furia' | 'arcano' | 'naturaleza' | 'orden' | 'sombra' | 'vacio';
 
 export type DeckFaction = 'Furia' | 'Arcano' | 'Naturaleza' | 'Orden' | 'Sombra' | 'Vacio';
@@ -20,7 +22,7 @@ export interface DeckDefinition {
   id: DeckId;
   name: string;
   faction: DeckFaction;
-  commanderFaction: 'FURIA' | 'ARCANO';
+  commanderFaction: Faction;
   archetype: string;
   description: string;
   tone: DeckTone;
@@ -72,7 +74,7 @@ export const DECK_CATALOG: readonly DeckDefinition[] = [
     id: 'NATURALEZA_RAICES',
     name: 'Raices Salvajes',
     faction: 'Naturaleza',
-    commanderFaction: 'FURIA',
+    commanderFaction: 'NATURALEZA',
     archetype: 'Bestias',
     description: 'Centauros, faunos y bestias flexibles que se mueven bien por el tablero.',
     tone: 'naturaleza',
@@ -82,7 +84,7 @@ export const DECK_CATALOG: readonly DeckDefinition[] = [
     id: 'NATURALEZA_GUARDIANES',
     name: 'Guardianes del Bosque',
     faction: 'Naturaleza',
-    commanderFaction: 'FURIA',
+    commanderFaction: 'NATURALEZA',
     archetype: 'Crecimiento',
     description: 'Totems, curacion y criaturas resistentes para ganar por presencia estable.',
     tone: 'naturaleza',
@@ -92,7 +94,7 @@ export const DECK_CATALOG: readonly DeckDefinition[] = [
     id: 'ORDEN_ALBA',
     name: 'Legion del Alba',
     faction: 'Orden',
-    commanderFaction: 'ARCANO',
+    commanderFaction: 'ORDEN',
     archetype: 'Aereo',
     description: 'Grifos, pegasos y luz sagrada para jugar limpio, movil y contundente.',
     tone: 'orden',
@@ -102,7 +104,7 @@ export const DECK_CATALOG: readonly DeckDefinition[] = [
     id: 'ORDEN_BASTION',
     name: 'Bastion Dorado',
     faction: 'Orden',
-    commanderFaction: 'ARCANO',
+    commanderFaction: 'ORDEN',
     archetype: 'Defensa',
     description: 'Clerigos, guardianes y estructuras que protegen hasta imponer ventaja.',
     tone: 'orden',
@@ -112,7 +114,7 @@ export const DECK_CATALOG: readonly DeckDefinition[] = [
     id: 'SOMBRA_CRIPTA',
     name: 'Cripta Maldita',
     faction: 'Sombra',
-    commanderFaction: 'ARCANO',
+    commanderFaction: 'SOMBRA',
     archetype: 'Desgaste',
     description: 'No-muertos, espectros y estructuras oscuras para desgastar al rival.',
     tone: 'sombra',
@@ -122,7 +124,7 @@ export const DECK_CATALOG: readonly DeckDefinition[] = [
     id: 'SOMBRA_NOBLEZA',
     name: 'Pacto de Sangre',
     faction: 'Sombra',
-    commanderFaction: 'ARCANO',
+    commanderFaction: 'SOMBRA',
     archetype: 'Ataque',
     description: 'Vampiros, demonios y pesadillas para presionar con amenazas duras.',
     tone: 'sombra',
@@ -132,7 +134,7 @@ export const DECK_CATALOG: readonly DeckDefinition[] = [
     id: 'VACIO_ABISMO',
     name: 'Abismo Astral',
     faction: 'Vacio',
-    commanderFaction: 'ARCANO',
+    commanderFaction: 'VACIO',
     archetype: 'Cosmico',
     description: 'Horrores del Vacio apoyados por magia estelar y control arcano.',
     tone: 'vacio',
@@ -142,7 +144,7 @@ export const DECK_CATALOG: readonly DeckDefinition[] = [
     id: 'VACIO_ENTROPIA',
     name: 'Entropia Silenciosa',
     faction: 'Vacio',
-    commanderFaction: 'ARCANO',
+    commanderFaction: 'VACIO',
     archetype: 'Late game',
     description: 'Plan lento y poderoso con leviatanes, devoradores y aniquilacion.',
     tone: 'vacio',

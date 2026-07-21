@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { initializeGame, playManaCard, summonUnit, moveUnit, combatAttack, getCombatPreview, playSpell } from '../engine';
+import { initializeGame, playManaCard, summonUnit, moveUnit, combatAttack, getCombatPreview, getMovementAllowance, playSpell } from '../engine';
 import { getPreconstructedDeck, CARDS_DB } from '../cardsDb';
 import { COMMANDER_COLUMN, OPPONENT_BACK_ROW, PLAYER_BACK_ROW } from '../boardConfig';
 
@@ -19,6 +19,8 @@ describe('Rules Engine', () => {
     expect(state.activePlayer).toBe('PLAYER');
     expect(state.player.hand).toHaveLength(5);
     expect(state.opponent.hand).toHaveLength(5);
+    expect(state.player.hand.some((card) => card.type === 'MANA')).toBe(true);
+    expect(state.opponent.hand.some((card) => card.type === 'MANA')).toBe(true);
     
     const playerCommanderKey = `${COMMANDER_COLUMN},${PLAYER_BACK_ROW}`;
     const opponentCommanderKey = `${COMMANDER_COLUMN},${OPPONENT_BACK_ROW}`;
@@ -244,6 +246,69 @@ describe('Rules Engine', () => {
     expect(state.board['2,3']?.health).toBe(2);
     expect(state.board['2,3']?.hasAttackedThisTurn).toBe(true);
     expect(state.opponent.graveyard.map((card) => card.id)).not.toContain('obstaculo-corriente');
+  });
+
+  it('should make each sanctuary obstacle create a distinct tactical decision', () => {
+    let state = initializeGame(furyDeck, arcaneDeck, commanderFury, commanderArcane, seed);
+    state.board = {
+      '3,3': {
+        id: 'ranged-attacker', cardId: 'mago-runa-helada', controller: 'PLAYER',
+        position: { x: 3, y: 3 }, health: 3, maxHealth: 3, attack: 2,
+        hasMovedThisTurn: false, hasAttackedThisTurn: false, frozenTurns: 0,
+      },
+      '3,5': {
+        id: 'covered-target', cardId: 'mago-runa-helada', controller: 'OPPONENT',
+        position: { x: 3, y: 5 }, health: 3, maxHealth: 3, attack: 2,
+        hasMovedThisTurn: false, hasAttackedThisTurn: false, frozenTurns: 0,
+      },
+      '4,5': {
+        id: 'cover-ridge', cardId: 'obstaculo-risco', controller: 'OPPONENT',
+        position: { x: 4, y: 5 }, health: 6, maxHealth: 6, attack: 0,
+        hasMovedThisTurn: true, hasAttackedThisTurn: true, frozenTurns: 0,
+      },
+      '1,2': {
+        id: 'slowed-hound', cardId: 'sabueso-brasa', controller: 'PLAYER',
+        position: { x: 1, y: 2 }, health: 1, maxHealth: 1, attack: 2,
+        hasMovedThisTurn: false, hasAttackedThisTurn: false, frozenTurns: 0,
+      },
+      '1,3': {
+        id: 'slowing-current', cardId: 'obstaculo-corriente', controller: 'OPPONENT',
+        position: { x: 1, y: 3 }, health: 3, maxHealth: 3, attack: 0,
+        hasMovedThisTurn: true, hasAttackedThisTurn: true, frozenTurns: 0,
+      },
+    };
+
+    const coveredPreview = getCombatPreview(state, { x: 3, y: 3 }, { x: 3, y: 5 });
+    expect(coveredPreview?.damageToTarget).toBe(1);
+    expect(coveredPreview?.notes.join(' ')).toContain('cobertura');
+    expect(getMovementAllowance(state, state.board['1,2'])).toBe(1);
+  });
+
+  it('should reward the player who clears crystal and current terrain', () => {
+    let state = initializeGame(furyDeck, arcaneDeck, commanderFury, commanderArcane, seed);
+    state.board['2,3'] = {
+      id: 'terrain-breaker', cardId: 'infiltrado-volcanico', controller: 'PLAYER',
+      position: { x: 2, y: 3 }, health: 2, maxHealth: 2, attack: 2,
+      hasMovedThisTurn: false, hasAttackedThisTurn: false, frozenTurns: 0,
+    };
+    state.board['2,4'] = {
+      id: 'reward-crystal', cardId: 'obstaculo-pilar', controller: 'OPPONENT',
+      position: { x: 2, y: 4 }, health: 1, maxHealth: 4, attack: 0,
+      hasMovedThisTurn: true, hasAttackedThisTurn: true, frozenTurns: 0,
+    };
+    const handBeforeCrystal = state.player.hand.length;
+    state = combatAttack(state, { x: 2, y: 3 }, { x: 2, y: 4 });
+    expect(state.player.hand).toHaveLength(handBeforeCrystal + 1);
+
+    state.board['2,3'].hasAttackedThisTurn = false;
+    state.player.manaSources.furia = { total: 2, spent: 1 };
+    state.board['2,4'] = {
+      id: 'reward-current', cardId: 'obstaculo-corriente', controller: 'OPPONENT',
+      position: { x: 2, y: 4 }, health: 1, maxHealth: 3, attack: 0,
+      hasMovedThisTurn: true, hasAttackedThisTurn: true, frozenTurns: 0,
+    };
+    state = combatAttack(state, { x: 2, y: 3 }, { x: 2, y: 4 });
+    expect(state.player.manaSources.furia.spent).toBe(0);
   });
 
   it('should let damage spells shatter terrain but reject control spells against it', () => {

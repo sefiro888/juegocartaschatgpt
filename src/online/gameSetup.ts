@@ -1,13 +1,7 @@
-import { CARDS_DB, getPreconstructedDeck } from '../core/cardsDb';
+import { getCommanderForFaction, getPreconstructedDeck } from '../core/cardsDb';
 import { DECK_CATALOG, getDeckDefinition, type DeckId } from '../core/deckCatalog';
 import { initializeGame } from '../core/engine';
-import type { Card, GameState } from '../types/card';
-
-function getCommander(faction: 'FURIA' | 'ARCANO'): Card {
-  return faction === 'FURIA'
-    ? CARDS_DB['comandante-furia']
-    : CARDS_DB['comandante-arcano'];
-}
+import type { GameState } from '../types/card';
 
 export function createOnlineGameState(hostDeckId: DeckId): GameState {
   const hostDeck = getDeckDefinition(hostDeckId);
@@ -17,8 +11,8 @@ export function createOnlineGameState(hostDeckId: DeckId): GameState {
   return initializeGame(
     getPreconstructedDeck(hostDeck.id),
     getPreconstructedDeck(guestDeck.id),
-    getCommander(hostDeck.commanderFaction),
-    getCommander(guestDeck.commanderFaction),
+    getCommanderForFaction(hostDeck.commanderFaction),
+    getCommanderForFaction(guestDeck.commanderFaction),
     `online-game-${Date.now()}`,
   );
 }
@@ -35,7 +29,7 @@ export function configureOnlineGuestDeck(gameState: GameState, guestDeckId: Deck
     completeHostDeck,
     getPreconstructedDeck(guestDeck.id),
     gameState.player.commander,
-    getCommander(guestDeck.commanderFaction),
+    getCommanderForFaction(guestDeck.commanderFaction),
     `${gameState.seed}-guest-ready`,
   );
 }

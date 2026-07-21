@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Copy, Link2, Users, Wifi } from 'lucide-react';
 import { DECK_CATALOG, type DeckId } from '../core/deckCatalog';
 import { useGameStore } from '../store/gameStore';
@@ -14,7 +14,8 @@ export const OnlineLobby: React.FC<OnlineLobbyProps> = ({ initialRoomCode = '', 
   const [roomCode, setRoomCode] = useState(initialRoomCode.toUpperCase());
   const [inviteLink, setInviteLink] = useState('');
   const [copied, setCopied] = useState(false);
-  const { createOnlineGame, joinOnlineGame, leaveOnlineGame, onlineSession, onlineError, isOnlineLoading } = useGameStore();
+  const resumeAttempted = useRef(false);
+  const { createOnlineGame, joinOnlineGame, resumeOnlineGame, leaveOnlineGame, onlineSession, onlineError, isOnlineLoading } = useGameStore();
   const selectedDeck = useMemo(
     () => DECK_CATALOG.find((deck) => deck.id === deckId) ?? DECK_CATALOG[0],
     [deckId],
@@ -31,6 +32,15 @@ export const OnlineLobby: React.FC<OnlineLobbyProps> = ({ initialRoomCode = '', 
     url.searchParams.set('sala', onlineSession.roomCode);
     setInviteLink(url.toString());
   }, [onlineSession]);
+
+  useEffect(() => {
+    if (!initialRoomCode || onlineSession || resumeAttempted.current) return;
+    resumeAttempted.current = true;
+    void resumeOnlineGame(initialRoomCode).then((resumed) => {
+      const session = useGameStore.getState().onlineSession;
+      if (resumed && session?.status !== 'waiting') onEnterGame();
+    });
+  }, [initialRoomCode, onEnterGame, onlineSession, resumeOnlineGame]);
 
   const createRoom = async () => {
     try {

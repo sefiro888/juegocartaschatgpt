@@ -1,5 +1,5 @@
 import type { GameState, Position, BoardEntity } from '../types/card';
-import { canAfford, canAttackTarget, playManaCard, summonUnit, moveUnit, combatAttack, playSpell, endTurn, isAdjacent, getDistance } from './engine';
+import { canAfford, canAffordCard, canAttackTarget, playManaCard, summonUnit, moveUnit, combatAttack, playSpell, endTurn, isAdjacent, getDistance, getMovementAllowance } from './engine';
 import { CARDS_DB } from './cardsDb';
 import { BOARD_SIZE, COMMANDER_COLUMN, OPPONENT_BACK_ROW, PLAYER_BACK_ROW } from './boardConfig';
 import { getReachablePositions, isBoardObstacle } from './boardPathfinding';
@@ -30,6 +30,7 @@ function reportAIAction(
 const ENEMY_TARGET_SPELLS = new Set([
   'lluvia-ceniza', 'chispa-fugaz', 'prision-glacial',
   'cometa-arcano', 'destello-runico', 'congelacion-rapida',
+  'espora-venenosa', 'juicio-divino', 'pesadilla-mortal',
 ]);
 
 // Buff spells that target a friendly unit
@@ -173,7 +174,7 @@ export function executeAITurn(state: GameState, observer?: AIActionObserver): Ga
     let spellCast = false;
 
     for (const card of handSpells) {
-      if (!canAfford(currentState.opponent, card)) continue;
+      if (!canAffordCard(currentState, 'OPPONENT', card)) continue;
 
       // --- AoE spells (no target needed) ---
       if (NO_TARGET_SPELLS.has(card.id)) {
@@ -303,6 +304,8 @@ export function executeAITurn(state: GameState, observer?: AIActionObserver): Ga
           if (card.id === 'lluvia-ceniza') spellDamage = 3;
           if (card.id === 'chispa-fugaz') spellDamage = 2;
           if (card.id === 'cometa-arcano') spellDamage = 4;
+          if (card.id === 'espora-venenosa') spellDamage = 2;
+          if (card.id === 'juicio-divino' || card.id === 'pesadilla-mortal') spellDamage = 3;
 
           let target: BoardEntity | undefined;
 
@@ -426,7 +429,7 @@ export function executeAITurn(state: GameState, observer?: AIActionObserver): Ga
       const possibleCoords = getReachablePositions(
         currentState.board,
         currentPos,
-        cardRef.movement ?? 1,
+        getMovementAllowance(currentState, unit),
         {
           allowDiagonal: true,
           canFly: cardRef.rulesText.includes('Vuelo'),

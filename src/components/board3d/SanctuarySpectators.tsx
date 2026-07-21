@@ -18,12 +18,16 @@ interface GuardianPerchProps {
 const GuardianPerch: React.FC<GuardianPerchProps> = ({ radius, accent, glow }) => (
   <group>
     <mesh position={[0, -0.12, 0]} castShadow receiveShadow>
-      <cylinderGeometry args={[radius * 0.88, radius, 0.34, 14]} />
-      <meshStandardMaterial color="#425564" roughness={0.96} metalness={0.03} />
+      <cylinderGeometry args={[radius * 0.88, radius, 0.34, 24]} />
+      <meshStandardMaterial color="#33444f" roughness={0.94} metalness={0.05} />
     </mesh>
     <mesh position={[0, 0.055, 0]} castShadow receiveShadow>
-      <cylinderGeometry args={[radius * 0.78, radius * 0.86, 0.12, 14]} />
-      <meshStandardMaterial color="#8495a1" roughness={0.9} metalness={0.04} />
+      <cylinderGeometry args={[radius * 0.78, radius * 0.86, 0.12, 24]} />
+      <meshStandardMaterial color="#718591" roughness={0.88} metalness={0.08} />
+    </mesh>
+    <mesh position={[0, 0.122, 0]} rotation={[Math.PI / 2, 0, 0]}>
+      <torusGeometry args={[radius * 0.74, 0.035, 8, 64]} />
+      <meshStandardMaterial color={accent} roughness={0.42} metalness={0.68} />
     </mesh>
     <mesh position={[0, 0.125, 0]} rotation={[Math.PI / 2, 0, 0]}>
       <torusGeometry args={[radius * 0.58, 0.025, 6, 48]} />
@@ -45,6 +49,26 @@ const GuardianPerch: React.FC<GuardianPerchProps> = ({ radius, accent, glow }) =
         toneMapped={false}
       />
     </mesh>
+    {Array.from({ length: 8 }, (_, index) => {
+      const angle = (index / 8) * Math.PI * 2;
+      return (
+        <mesh
+          key={index}
+          position={[Math.cos(angle) * radius * 0.68, 0.13, Math.sin(angle) * radius * 0.68]}
+          rotation={[0, -angle, 0]}
+          castShadow
+        >
+          <boxGeometry args={[0.09, 0.035, radius * 0.18]} />
+          <meshStandardMaterial
+            color={accent}
+            emissive={glow}
+            emissiveIntensity={0.22}
+            roughness={0.5}
+            metalness={0.62}
+          />
+        </mesh>
+      );
+    })}
   </group>
 );
 
@@ -103,11 +127,12 @@ const AnimatedGuardian: React.FC<AnimatedGuardianProps> = ({
           material.color.multiply(new THREE.Color(tint));
           material.emissive.set(emissive);
           material.emissiveIntensity = emissiveIntensity;
-          material.roughness = Math.max(material.roughness, 0.7);
-          material.metalness = Math.min(material.metalness, 0.12);
+          material.roughness = Math.max(material.roughness, 0.76);
+          material.metalness = Math.min(material.metalness, 0.08);
+          material.envMapIntensity = 0.72;
           if (material.map) {
             material.map.colorSpace = THREE.SRGBColorSpace;
-            material.map.anisotropy = 4;
+            material.map.anisotropy = 8;
           }
           material.needsUpdate = true;
         }
@@ -174,33 +199,33 @@ export const SanctuarySpectators: React.FC = () => (
       animationName="Idle Alert"
       position={[-9.25, 1.32, 4.65]}
       rotationY={2.05}
-      scale={[1.08, 0.94, 0.94]}
+      scale={[0.92, 0.84, 0.84]}
       phase={0.4}
-      tint="#615251"
-      emissive="#4a1708"
-      emissiveIntensity={0.3}
+      tint="#796c69"
+      emissive="#35150d"
+      emissiveIntensity={0.18}
       perchRadius={1.28}
       accent="#e2b36a"
       glow="#ec6b2d"
       sparkleColor="#ffd09a"
-      lightIntensity={0.72}
+      lightIntensity={0.52}
       lightDistance={3.8}
     />
     <AnimatedGuardian
       url={CALDERA_DRAKE_URL}
       animationName="Idle"
-      position={[8.9, 1.32, -4.05]}
+      position={[9.12, 1.32, -4.28]}
       rotationY={-1.15}
-      scale={[0.64, 0.64, 0.64]}
+      scale={[0.54, 0.54, 0.54]}
       phase={2.2}
-      tint="#d7a09b"
-      emissive="#4b1207"
-      emissiveIntensity={0.2}
+      tint="#ae8580"
+      emissive="#38140b"
+      emissiveIntensity={0.14}
       perchRadius={1.48}
       accent="#d9a45d"
       glow="#e76327"
       sparkleColor="#ffc081"
-      lightIntensity={0.76}
+      lightIntensity={0.54}
       lightDistance={4}
     />
   </group>

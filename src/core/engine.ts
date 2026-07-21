@@ -2,6 +2,15 @@ import type { Card, GameState, Position, BoardEntity, PlayerState } from '../typ
 import { CARDS_DB } from './cardsDb';
 import { COMMANDER_COLUMN, OPPONENT_BACK_ROW, PLAYER_BACK_ROW, isInsideBoard } from './boardConfig';
 import { findMovementPath, hasLineOfSight, isBoardObstacle } from './boardPathfinding';
+import { getObstacleDefinition } from './obstacleConfig';
+import {
+  MANA_TYPES,
+  cloneManaSources,
+  createEmptyManaSources,
+  factionToManaType,
+  getAvailableMana,
+  getCardFactionCosts,
+} from './factionRules';
 
 // Seedable PRNG (SplitMix32)
 export function createRandom(seedStr: string) {
@@ -46,6 +55,30 @@ export function isAdjacent(pos1: Position, pos2: Position, allowDiagonal = false
   return (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
 }
 
+function drawOpeningHand(deck: Card[], size: number): Card[] {
+  const hand = deck.splice(0, size);
+  if (hand.some((card) => card.type === 'MANA')) return hand;
+
+  const manaIndex = deck.findIndex((card) => card.type === 'MANA');
+  if (manaIndex < 0 || hand.length === 0) return hand;
+  const [manaCard] = deck.splice(manaIndex, 1);
+  const replacedCard = hand[hand.length - 1];
+  hand[hand.length - 1] = manaCard;
+  deck.push(replacedCard);
+  return hand;
+}
+
+function hasRidgeCover(
+  board: Record<string, BoardEntity>,
+  attackerPosition: Position,
+  targetPosition: Position,
+): boolean {
+  if (getDistance(attackerPosition, targetPosition) <= 1) return false;
+  return Object.values(board).some((entity) =>
+    entity.cardId === 'obstaculo-risco' && isAdjacent(entity.position, targetPosition),
+  );
+}
+
 function isInCardAttackGeometry(
   board: Record<string, BoardEntity>,
   attackerPosition: Position,
@@ -62,6 +95,20 @@ function isInCardAttackGeometry(
   }
   return getDistance(attackerPosition, targetPosition) <= range &&
     hasLineOfSight(board, attackerPosition, targetPosition);
+}
+
+function getEffectiveAttack(board: Record<string, BoardEntity>, entity: BoardEntity): number {
+  const card = CARDS_DB[entity.cardId];
+  if (!card || entity.cardId === 'cacique-orco') return entity.attack;
+  const receivesCaciqueAura = card.subtype === 'Guerrero' || card.subtype === 'Orco';
+  if (!receivesCaciqueAura) return entity.attack;
+
+  const auraBonus = Object.values(board).filter((candidate) =>
+    candidate.cardId === 'cacique-orco'
+      && candidate.controller === entity.controller
+      && isAdjacent(candidate.position, entity.position),
+  ).length;
+  return entity.attack + auraBonus;
 }
 
 export function canAttackTarget(
@@ -89,6 +136,21 @@ export function canSpellTargetObstacle(cardId: string): boolean {
   return cardId === 'lluvia-ceniza' || cardId === 'chispa-fugaz' || cardId === 'cometa-arcano';
 }
 
+export function getMovementAllowance(state: GameState, entity: BoardEntity): number {
+  const card = CARDS_DB[entity.cardId];
+  if (!card || card.type === 'ESTRUCTURA') return 0;
+  const slowedByGallows = Object.values(state.board).some((candidate) =>
+    candidate.cardId === 'horca-renegada'
+      && candidate.controller !== entity.controller
+      && isAdjacent(candidate.position, entity.position),
+  );
+  const slowedByCurrent = Object.values(state.board).some((candidate) =>
+    candidate.cardId === 'obstaculo-corriente'
+      && isAdjacent(candidate.position, entity.position),
+  );
+  return Math.max(0, (card.movement ?? 1) - (slowedByGallows || slowedByCurrent ? 1 : 0));
+}
+
 export interface CombatPreview {
   damageToTarget: number;
   damageToAttacker: number;
@@ -112,7 +174,11 @@ export function getCombatPreview(
   if (!attackerCard || (!targetCard && !isBoardObstacle(target))) return null;
 
   const notes: string[] = [];
-  let damageToTarget = attacker.attack;
+  let damageToTarget = getEffectiveAttack(state.board, attacker);
+  if (!isBoardObstacle(target) && hasRidgeCover(state.board, attacker.position, target.position)) {
+    damageToTarget = Math.max(0, damageToTarget - 1);
+    notes.push('El risco cercano concede cobertura: -1 de dano recibido.');
+  }
   if (targetCard?.rulesText.includes('Resistencia')) {
     damageToTarget = Math.max(0, damageToTarget - 1);
     notes.push('El objetivo reduce 1 de daño.');
@@ -124,7 +190,7 @@ export function getCombatPreview(
 
   const targetCanRetaliate = !isBoardObstacle(target) && targetCard?.type !== 'ESTRUCTURA' &&
     isInCardAttackGeometry(state.board, target.position, attacker.position, targetCard);
-  let damageToAttacker = targetCanRetaliate ? target.attack : 0;
+  let damageToAttacker = targetCanRetaliate ? getEffectiveAttack(state.board, target) : 0;
   if (attackerCard.rulesText.includes('Resistencia')) {
     damageToAttacker = Math.max(0, damageToAttacker - 1);
     notes.push('Tu unidad reduce 1 de daño.');
@@ -139,11 +205,17 @@ export function getCombatPreview(
     notes.push('Furia: tu berserker se hiere por atacar.');
   }
 
+  const targetWillFall = target.health - damageToTarget <= 0;
+  if (isBoardObstacle(target) && targetWillFall) {
+    const reward = getObstacleDefinition(target.cardId).destructionReward;
+    if (reward) notes.push(reward);
+  }
+
   return {
     damageToTarget,
     damageToAttacker,
     targetCanRetaliate,
-    targetWillFall: target.health - damageToTarget <= 0,
+    targetWillFall,
     attackerWillFall: attacker.health - damageToAttacker <= 0,
     notes,
   };
@@ -156,10 +228,7 @@ function clonePlayer(p: PlayerState): PlayerState {
     hand: [...p.hand],
     deck: [...p.deck],
     graveyard: [...p.graveyard],
-    manaSources: {
-      furia: { ...p.manaSources.furia },
-      arcano: { ...p.manaSources.arcano },
-    },
+    manaSources: cloneManaSources(p.manaSources),
   };
 }
 
@@ -186,6 +255,20 @@ function resolveEntityDeath(
   const refCard = CARDS_DB[entity.cardId];
   if (refCard) ownerState.graveyard.push(refCard);
 
+  if (entity.cardId === 'totem-naturaleza') {
+    for (const nearby of Object.values(board)) {
+      const nearbyCard = CARDS_DB[nearby.cardId];
+      if (
+        nearby.controller === entity.controller
+        && nearbyCard?.type === 'UNIDAD'
+        && isAdjacent(nearby.position, entity.position)
+      ) {
+        nearby.maxHealth = Math.max(nearbyCard.maxHealth ?? 1, nearby.maxHealth - 1);
+        nearby.health = Math.min(nearby.health, nearby.maxHealth);
+      }
+    }
+  }
+
   // Commander death -> game over
   if (entity.id === 'commander-player') return 'OPPONENT';
   if (entity.id === 'commander-opponent') return 'PLAYER';
@@ -207,13 +290,15 @@ function resolveDeathTrigger(
   player: PlayerState,
   opponent: PlayerState,
 ): 'PLAYER' | 'OPPONENT' | null {
-  if (deadCardId !== 'elemental-lava') return null;
+  const deathDamage = deadCardId === 'elemental-lava' ? 2 : deadCardId === 'zombi-infectado' ? 1 : 0;
+  if (deathDamage === 0) return null;
 
   // Elemental de Lava: deal 2 damage to all adjacent units
   for (const key of Object.keys(board)) {
     const ent = board[key];
+    if (!ent) continue;
     if (!isBoardObstacle(ent) && isAdjacent(ent.position, deathPos, false)) {
-      ent.health -= 2;
+      ent.health -= deathDamage;
       if (ent.health <= 0) {
         const w = resolveEntityDeath(board, key, ent, player, opponent);
         if (w) return w;
@@ -246,8 +331,8 @@ export function initializeGame(
   const shuffledDeck2 = shuffleDeck(deck2, random);
 
   // Draw 5 starting cards
-  const hand1 = shuffledDeck1.splice(0, 5);
-  const hand2 = shuffledDeck2.splice(0, 5);
+  const hand1 = drawOpeningHand(shuffledDeck1, 5);
+  const hand2 = drawOpeningHand(shuffledDeck2, 5);
 
   const playerState1: PlayerState = {
     id: 'PLAYER',
@@ -255,10 +340,7 @@ export function initializeGame(
     hand: hand1,
     deck: shuffledDeck1,
     graveyard: [],
-    manaSources: {
-      furia: { total: 0, spent: 0 },
-      arcano: { total: 0, spent: 0 }
-    },
+    manaSources: createEmptyManaSources(),
     manaPlayedThisTurn: false,
     commander: commander1,
     commanderInPlay: true,
@@ -270,10 +352,7 @@ export function initializeGame(
     hand: hand2,
     deck: shuffledDeck2,
     graveyard: [],
-    manaSources: {
-      furia: { total: 0, spent: 0 },
-      arcano: { total: 0, spent: 0 }
-    },
+    manaSources: createEmptyManaSources(),
     manaPlayedThisTurn: false,
     commander: commander2,
     commanderInPlay: true,
@@ -349,47 +428,111 @@ export function initializeGame(
 export function canAfford(player: PlayerState, card: Card): boolean {
   if (card.type === 'MANA') return true;
 
-  const cost = card.cost;
-  const genCost = cost.generic;
-  const furiaCost = cost.furia || 0;
-  const arcanoCost = cost.arcano || 0;
+  const factionCosts = getCardFactionCosts(card);
+  if (factionCosts.some(({ manaType, amount }) => getAvailableMana(player.manaSources, manaType) < amount)) {
+    return false;
+  }
 
-  const fAvail = player.manaSources.furia.total - player.manaSources.furia.spent;
-  const aAvail = player.manaSources.arcano.total - player.manaSources.arcano.spent;
+  const genericPool = MANA_TYPES.reduce((total, manaType) => {
+    const required = card.cost[manaType] ?? 0;
+    return total + Math.max(0, getAvailableMana(player.manaSources, manaType) - required);
+  }, 0);
 
-  if (fAvail < furiaCost || aAvail < arcanoCost) return false;
+  return genericPool >= card.cost.generic;
+}
 
-  const remainingFuria = fAvail - furiaCost;
-  const remainingArcano = aAvail - arcanoCost;
-  const totalRemaining = remainingFuria + remainingArcano;
+function rewardObstacleDestruction(obstacle: BoardEntity, recipient: PlayerState): PlayerState {
+  if (obstacle.cardId === 'obstaculo-pilar') return drawCard(recipient);
+  if (obstacle.cardId !== 'obstaculo-corriente') return recipient;
 
-  return totalRemaining >= genCost;
+  const manaSources = cloneManaSources(recipient.manaSources);
+  for (const manaType of MANA_TYPES) {
+    const source = manaSources[manaType];
+    if (source.spent <= 0) continue;
+    source.spent -= 1;
+    return { ...recipient, manaSources };
+  }
+  return recipient;
+}
+
+function getEffectiveCardForPayment(
+  state: GameState,
+  playerId: 'PLAYER' | 'OPPONENT',
+  card: Card,
+): Card {
+  if (card.type !== 'HECHIZO') return card;
+  const discount = Object.values(state.board).filter((entity) =>
+    entity.controller === playerId
+      && (entity.cardId === 'aprendiz-nexo' || entity.cardId === 'avatar-cosmos'),
+  ).length;
+  if (discount === 0) return card;
+
+  return {
+    ...card,
+    cost: {
+      ...card.cost,
+      generic: Math.max(0, card.cost.generic - discount),
+    },
+  };
+}
+
+export function canAffordCard(
+  state: GameState,
+  playerId: 'PLAYER' | 'OPPONENT',
+  card: Card,
+): boolean {
+  const player = playerId === 'PLAYER' ? state.player : state.opponent;
+  return canAfford(player, getEffectiveCardForPayment(state, playerId, card));
+}
+
+function createEntityInstanceId(
+  state: GameState,
+  playerId: 'PLAYER' | 'OPPONENT',
+  cardId: string,
+): string {
+  const prefix = `${cardId}-${playerId.toLowerCase()}-${state.turn}`;
+  let sequence = 1;
+  const usedIds = new Set(Object.values(state.board).map((entity) => entity.id));
+
+  while (usedIds.has(`${prefix}-${sequence}`)) sequence += 1;
+  return `${prefix}-${sequence}`;
+}
+
+function createActionRandom(
+  state: GameState,
+  playerId: 'PLAYER' | 'OPPONENT',
+  actionId: string,
+) {
+  const player = playerId === 'PLAYER' ? state.player : state.opponent;
+  return createRandom([
+    state.seed,
+    state.turn,
+    state.activePlayer,
+    playerId,
+    actionId,
+    player.hand.length,
+    player.graveyard.length,
+    Object.keys(state.board).length,
+  ].join(':'));
 }
 
 // Deduct mana cost
 export function deductMana(player: PlayerState, card: Card): PlayerState {
-  const cost = card.cost;
-  let genCost = cost.generic;
-  const furiaCost = cost.furia || 0;
-  const arcanoCost = cost.arcano || 0;
+  const manaSources = cloneManaSources(player.manaSources);
 
-  const manaSources = {
-    furia: { ...player.manaSources.furia },
-    arcano: { ...player.manaSources.arcano }
-  };
+  for (const { manaType, amount } of getCardFactionCosts(card)) {
+    manaSources[manaType].spent += amount;
+  }
 
-  manaSources.furia.spent += furiaCost;
-  manaSources.arcano.spent += arcanoCost;
-
-  // Deduct generic mana from remaining sources
-  const fAvail = manaSources.furia.total - manaSources.furia.spent;
-
-  if (fAvail >= genCost) {
-    manaSources.furia.spent += genCost;
-  } else {
-    manaSources.furia.spent += fAvail;
-    genCost -= fAvail;
-    manaSources.arcano.spent += genCost;
+  let genericRemaining = card.cost.generic;
+  const paymentOrder = [...MANA_TYPES].sort(
+    (left, right) => getAvailableMana(manaSources, right) - getAvailableMana(manaSources, left),
+  );
+  for (const manaType of paymentOrder) {
+    if (genericRemaining <= 0) break;
+    const payment = Math.min(genericRemaining, getAvailableMana(manaSources, manaType));
+    manaSources[manaType].spent += payment;
+    genericRemaining -= payment;
   }
 
   return { ...player, manaSources };
@@ -414,11 +557,7 @@ export function playManaCard(state: GameState, playerId: 'PLAYER' | 'OPPONENT', 
   updatedPlayer.hand = newHand;
   updatedPlayer.manaPlayedThisTurn = true;
 
-  if (card.faction === 'FURIA') {
-    updatedPlayer.manaSources.furia.total += 1;
-  } else if (card.faction === 'ARCANO') {
-    updatedPlayer.manaSources.arcano.total += 1;
-  }
+  updatedPlayer.manaSources[factionToManaType(card.faction)].total += 1;
 
   return {
     ...state,
@@ -480,7 +619,7 @@ export function summonUnit(
     hand: nextPlayerState.hand.filter((_, idx) => idx !== cardIndex),
   };
 
-  const instanceId = `${card.id}_${Date.now()}`;
+  const instanceId = createEntityInstanceId(state, playerId, card.id);
   const newEntity: BoardEntity = {
     id: instanceId,
     cardId: card.id,
@@ -503,6 +642,29 @@ export function summonUnit(
   let nextBoard = cloneBoard(state.board);
   nextBoard[posKey] = newEntity;
 
+  if (card.type === 'UNIDAD') {
+    const adjacentTotems = Object.values(nextBoard).filter((entity) =>
+      entity.cardId === 'totem-naturaleza'
+        && entity.controller === playerId
+        && isAdjacent(entity.position, pos),
+    ).length;
+    newEntity.maxHealth += adjacentTotems;
+    newEntity.health += adjacentTotems;
+  } else if (card.id === 'totem-naturaleza') {
+    for (const entity of Object.values(nextBoard)) {
+      const entityCard = CARDS_DB[entity.cardId];
+      if (
+        entity.id !== newEntity.id
+        && entity.controller === playerId
+        && entityCard?.type === 'UNIDAD'
+        && isAdjacent(entity.position, pos)
+      ) {
+        entity.maxHealth += 1;
+        entity.health += 1;
+      }
+    }
+  }
+
   let pState1 = playerId === 'PLAYER' ? nextPlayerState : clonePlayer(state.player);
   let pState2 = playerId === 'OPPONENT' ? nextPlayerState : clonePlayer(state.opponent);
   let winner = state.winner;
@@ -513,6 +675,7 @@ export function summonUnit(
   if (card.id === 'dragon-caldera') {
     for (const key of Object.keys(nextBoard)) {
       const ent = nextBoard[key];
+      if (!ent) continue;
       if (!isBoardObstacle(ent) && ent.controller !== playerId && isAdjacent(ent.position, pos, false)) {
         ent.health -= 2;
         if (ent.health <= 0) {
@@ -539,12 +702,13 @@ export function summonUnit(
     const adjacentEnemies: { key: string; ent: BoardEntity }[] = [];
     for (const key of Object.keys(nextBoard)) {
       const ent = nextBoard[key];
+      if (!ent) continue;
       if (!isBoardObstacle(ent) && ent.controller !== playerId && isAdjacent(ent.position, pos, false)) {
         adjacentEnemies.push({ key, ent });
       }
     }
     if (adjacentEnemies.length > 0) {
-      const random = createRandom(state.seed + Date.now());
+      const random = createActionRandom(state, playerId, `${card.id}:discard`);
       const idx = Math.floor(random() * adjacentEnemies.length);
       const target = adjacentEnemies[idx];
       target.ent.health -= 1;
@@ -561,7 +725,7 @@ export function summonUnit(
   if (card.id === 'trasgo-piroclastico') {
     const ownerState = playerId === 'PLAYER' ? pState1 : pState2;
     if (ownerState.hand.length > 0) {
-      const random = createRandom(state.seed + Date.now());
+      const random = createActionRandom(state, playerId, `${card.id}:freeze`);
       const discardIdx = Math.floor(random() * ownerState.hand.length);
       const discarded = ownerState.hand[discardIdx];
       ownerState.hand = ownerState.hand.filter((_, idx) => idx !== discardIdx);
@@ -575,7 +739,7 @@ export function summonUnit(
       ent => !isBoardObstacle(ent) && ent.controller !== playerId && ent.id !== 'commander-player' && ent.id !== 'commander-opponent'
     );
     if (enemyUnits.length > 0) {
-      const random = createRandom(state.seed + Date.now());
+      const random = createActionRandom(state, playerId, `${card.id}:refresh`);
       const shuffled = [...enemyUnits].sort(() => random() - 0.5);
       const toFreeze = shuffled.slice(0, 2);
       for (const ent of toFreeze) {
@@ -592,6 +756,18 @@ export function summonUnit(
       targetEnt.hasMovedThisTurn = false;
       targetEnt.hasAttackedThisTurn = false;
     }
+  }
+
+  if (card.id === 'fauno-bosque') {
+    const target = Object.values(nextBoard)
+      .filter((entity) =>
+        entity.id !== newEntity.id
+          && entity.controller === playerId
+          && isAdjacent(entity.position, pos)
+          && entity.health < entity.maxHealth,
+      )
+      .sort((left, right) => (left.health / left.maxHealth) - (right.health / right.maxHealth))[0];
+    if (target) target.health = Math.min(target.maxHealth, target.health + 1);
   }
 
   // Support Crimson Forge effect (+1/+0 to units summoned adjacent to it)
@@ -631,7 +807,7 @@ export function moveUnit(state: GameState, from: Position, to: Position): GameSt
   const card = CARDS_DB[entity.cardId];
   if (!card || card.type === 'ESTRUCTURA') return state;
 
-  const movementAllowance = card.movement ?? 1;
+  const movementAllowance = getMovementAllowance(state, entity);
   const path = findMovementPath(state.board, from, to, movementAllowance, {
     allowDiagonal: true,
     canFly: card.rulesText.includes('Vuelo'),
@@ -682,8 +858,11 @@ export function combatAttack(state: GameState, attackerPos: Position, targetPos:
   // Resolve damage
   // Centinela de Cristal has Resistencia (ignores 1st damage)
   // Let's implement this: "ignores the first damage received each turn". To keep it simple, we can reduce incoming damage by 1.
-  let damageToTarget = attacker.attack;
+  let damageToTarget = getEffectiveAttack(newBoard, attacker);
   const tarCard = CARDS_DB[target.cardId];
+  if (!isBoardObstacle(target) && hasRidgeCover(newBoard, attacker.position, target.position)) {
+    damageToTarget = Math.max(0, damageToTarget - 1);
+  }
   if (tarCard && tarCard.rulesText.includes('Resistencia')) {
     damageToTarget = Math.max(0, damageToTarget - 1);
   }
@@ -693,7 +872,7 @@ export function combatAttack(state: GameState, attackerPos: Position, targetPos:
     tarCard.type !== 'ESTRUCTURA' &&
     isInCardAttackGeometry(newBoard, target.position, attacker.position, tarCard),
   );
-  let damageToAttacker = targetCanRetaliate ? target.attack : 0;
+  let damageToAttacker = targetCanRetaliate ? getEffectiveAttack(newBoard, target) : 0;
   if (attCard && attCard.rulesText.includes('Resistencia')) {
     damageToAttacker = Math.max(0, damageToAttacker - 1);
   }
@@ -715,6 +894,10 @@ export function combatAttack(state: GameState, attackerPos: Position, targetPos:
     attacker.health -= damageToAttacker;
   }
 
+  if (attCard.id === 'vampiro-noble' && !isBoardObstacle(target) && damageToTarget > 0) {
+    attacker.health = Math.min(attacker.maxHealth, attacker.health + 1);
+  }
+
   // Handle Berserker Ignívoro self-damage (Furia: deals 1 damage to itself when attacking)
   if (attCard.id === 'berserker-ignivoro') {
     attacker.health -= 1;
@@ -725,6 +908,7 @@ export function combatAttack(state: GameState, attackerPos: Position, targetPos:
     const enemyCmdId = attacker.controller === 'PLAYER' ? 'commander-opponent' : 'commander-player';
     for (const key of Object.keys(newBoard)) {
       const ent = newBoard[key];
+      if (!ent) continue;
       if (ent.id === enemyCmdId) {
         ent.health -= 1;
         if (ent.health <= 0) {
@@ -749,6 +933,8 @@ export function combatAttack(state: GameState, attackerPos: Position, targetPos:
   // Resolve deaths
   if (target.health <= 0 && isBoardObstacle(target)) {
     delete newBoard[tarKey];
+    if (attacker.controller === 'PLAYER') player1 = rewardObstacleDestruction(target, player1);
+    else player2 = rewardObstacleDestruction(target, player2);
   } else if (target.health <= 0) {
     const savedCardId = target.cardId;
     const savedPos = { ...target.position };
@@ -790,7 +976,7 @@ export function playSpell(
   const card = player.hand[cardIndex];
   if (card.type !== 'HECHIZO') return state;
 
-  if (!canAfford(player, card)) return state;
+  if (!canAffordCard(state, playerId, card)) return state;
 
   // Spell-Immunity Check: Golem de Glaciar / Avatar del Cosmos are immune to spells.
   if (targetPos) {
@@ -802,7 +988,7 @@ export function playSpell(
     }
   }
 
-  let nextPlayerState = deductMana(player, card);
+  let nextPlayerState = deductMana(player, getEffectiveCardForPayment(state, playerId, card));
   nextPlayerState = {
     ...nextPlayerState,
     hand: nextPlayerState.hand.filter((_, idx) => idx !== cardIndex),
@@ -822,6 +1008,8 @@ export function playSpell(
     if (ent.health <= 0) {
       if (isBoardObstacle(ent)) {
         delete nextBoard[key];
+        if (playerId === 'PLAYER') pState1 = rewardObstacleDestruction(ent, pState1);
+        else pState2 = rewardObstacleDestruction(ent, pState2);
         return;
       }
       const savedCardId = ent.cardId;
@@ -845,7 +1033,7 @@ export function playSpell(
     // Discard random card
     const casterState = playerId === 'PLAYER' ? pState1 : pState2;
     if (casterState.hand.length > 0) {
-      const random = createRandom(state.seed + Date.now());
+      const random = createActionRandom(state, playerId, `${card.id}:discard`);
       const discardIdx = Math.floor(random() * casterState.hand.length);
       const discarded = casterState.hand[discardIdx];
       casterState.hand = casterState.hand.filter((_, idx) => idx !== discardIdx);
@@ -869,6 +1057,14 @@ export function playSpell(
     const drawn = drawCard(casterState);
     if (playerId === 'PLAYER') pState1 = drawn;
     else pState2 = drawn;
+  }
+
+  if (card.id === 'espora-venenosa' && targetPos) {
+    dealDamageAtKey(`${targetPos.x},${targetPos.y}`, 2);
+  }
+
+  if ((card.id === 'juicio-divino' || card.id === 'pesadilla-mortal') && targetPos) {
+    dealDamageAtKey(`${targetPos.x},${targetPos.y}`, 3);
   }
 
   if (card.id === 'destello-runico' && targetPos) {
@@ -954,6 +1150,7 @@ export function playSpell(
     const targetX = targetPos.x;
     for (const key of Object.keys(nextBoard)) {
       const ent = nextBoard[key];
+      if (!ent) continue;
       if (!isBoardObstacle(ent) && ent.controller !== playerId && ent.position.x === targetX) {
         // Respect spell immunity
         const entCard = CARDS_DB[ent.cardId];
@@ -972,6 +1169,41 @@ export function playSpell(
   };
 }
 
+function resolveAdditionalStartTurnStructures(
+  board: Record<string, BoardEntity>,
+  controller: 'PLAYER' | 'OPPONENT',
+  initialPlayerState: PlayerState,
+): PlayerState {
+  let playerState = initialPlayerState;
+
+  for (const entity of Object.values(board)) {
+    if (entity.controller !== controller) continue;
+
+    if (entity.cardId === 'obelisco-estelar') {
+      const hasAdjacentUnit = Object.values(board).some((candidate) =>
+        candidate.controller === controller
+          && candidate.id !== entity.id
+          && CARDS_DB[candidate.cardId]?.type === 'UNIDAD'
+          && isAdjacent(candidate.position, entity.position),
+      );
+      if (hasAdjacentUnit) playerState = drawCard(playerState);
+    }
+
+    if (entity.cardId === 'tumba-olvidada') {
+      const target = Object.values(board)
+        .filter((candidate) =>
+          candidate.controller === controller
+            && CARDS_DB[candidate.cardId]?.faction === 'SOMBRA'
+            && candidate.health < candidate.maxHealth,
+        )
+        .sort((left, right) => left.health - right.health)[0];
+      if (target) target.health = Math.min(target.maxHealth, target.health + 1);
+    }
+  }
+
+  return playerState;
+}
+
 // End Turn (BUG FIX: deep-clone nested objects before mutating)
 export function endTurn(state: GameState): GameState {
   const nextActive = state.activePlayer === 'PLAYER' ? 'OPPONENT' : 'PLAYER';
@@ -988,6 +1220,7 @@ export function endTurn(state: GameState): GameState {
   // Golem de la Fundición: deal 1 damage to all adjacent units at end of owner's turn
   for (const key of Object.keys(nextBoard)) {
     const ent = nextBoard[key];
+    if (!ent) continue;
     if (ent.cardId === 'golem-fundicion' && ent.controller === outgoing) {
       const golemPos = ent.position;
       for (const adjKey of Object.keys(nextBoard)) {
@@ -1011,8 +1244,7 @@ export function endTurn(state: GameState): GameState {
 
   // Restore and increment mana for the incoming player
   if (nextActive === 'PLAYER') {
-    playerState.manaSources.furia.spent = 0;
-    playerState.manaSources.arcano.spent = 0;
+    for (const manaType of MANA_TYPES) playerState.manaSources[manaType].spent = 0;
     playerState.manaPlayedThisTurn = false;
     playerState = drawCard(playerState);
 
@@ -1024,10 +1256,12 @@ export function endTurn(state: GameState): GameState {
         playerState = drawCard(playerState);
       }
     }
+    playerState = resolveAdditionalStartTurnStructures(nextBoard, 'PLAYER', playerState);
 
     // Pilar de Fuego: deal 2 damage to a random enemy unit in same row
     for (const key of Object.keys(nextBoard)) {
       const entity = nextBoard[key];
+      if (!entity) continue;
       if (entity.cardId === 'pilar-fuego' && entity.controller === 'PLAYER') {
         const pilarY = entity.position.y;
         const enemiesInRow: { key: string; ent: BoardEntity }[] = [];
@@ -1080,8 +1314,7 @@ export function endTurn(state: GameState): GameState {
 
   } else {
     // Restore opponent mana
-    opponentState.manaSources.furia.spent = 0;
-    opponentState.manaSources.arcano.spent = 0;
+    for (const manaType of MANA_TYPES) opponentState.manaSources[manaType].spent = 0;
     opponentState.manaPlayedThisTurn = false;
     opponentState = drawCard(opponentState);
 
@@ -1093,10 +1326,12 @@ export function endTurn(state: GameState): GameState {
         opponentState = drawCard(opponentState);
       }
     }
+    opponentState = resolveAdditionalStartTurnStructures(nextBoard, 'OPPONENT', opponentState);
 
     // Pilar de Fuego for opponent
     for (const key of Object.keys(nextBoard)) {
       const entity = nextBoard[key];
+      if (!entity) continue;
       if (entity.cardId === 'pilar-fuego' && entity.controller === 'OPPONENT') {
         const pilarY = entity.position.y;
         const enemiesInRow: { key: string; ent: BoardEntity }[] = [];
@@ -1148,6 +1383,7 @@ export function endTurn(state: GameState): GameState {
   // Refresh units on board belonging to incoming player
   for (const key of Object.keys(nextBoard)) {
     const entity = nextBoard[key];
+    if (!entity) continue;
     if (entity.controller === nextActive) {
       entity.hasMovedThisTurn = false;
       entity.hasAttackedThisTurn = false;

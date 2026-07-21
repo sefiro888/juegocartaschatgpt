@@ -4,6 +4,7 @@ import { DECK_CATALOG, type DeckId } from '../core/deckCatalog';
 import { LORE_DB } from '../core/loreDb';
 import { CardDOM } from './CardDOM';
 import type { Card } from '../types/card';
+import { getTotalCardCost } from '../core/factionRules';
 
 interface DeckViewerProps {
   onBack?: () => void;
@@ -32,7 +33,7 @@ export const DeckViewer: React.FC<DeckViewerProps> = ({ onBack }) => {
       if (b.card.type === 'COMANDANTE') return 1;
       if (a.card.type === 'MANA' && b.card.type !== 'MANA') return -1;
       if (b.card.type === 'MANA' && a.card.type !== 'MANA') return 1;
-      return a.card.cost.generic - b.card.cost.generic;
+      return getTotalCardCost(a.card) - getTotalCardCost(b.card);
     });
   }, [deck]);
 

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Line, OrbitControls } from '@react-three/drei';
+import { Line, OrbitControls, PerformanceMonitor } from '@react-three/drei';
+import { RotateCcw } from 'lucide-react';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { useGameStore } from '../../store/gameStore';
@@ -9,7 +10,7 @@ import { FloatingSanctuary } from './FloatingSanctuary';
 import { BoardFoundation, SanctuaryObstacle } from './SanctuaryBoardAssets';
 import { SanctuaryMaterialsProvider, useSanctuaryMaterials } from './SanctuaryMaterials';
 import type { BoardEntity, Position } from '../../types/card';
-import { canAttackTarget, canSpellTargetObstacle, getCombatPreview, isAdjacent } from '../../core/engine';
+import { canAttackTarget, canSpellTargetObstacle, getCombatPreview, getMovementAllowance, isAdjacent } from '../../core/engine';
 import { CARDS_DB } from '../../core/cardsDb';
 import { OPPONENT_BACK_ROW, PLAYER_BACK_ROW } from '../../core/boardConfig';
 import { getObstacleDefinition } from '../../core/obstacleConfig';
@@ -35,6 +36,15 @@ const HIGHLIGHT_COLORS: Record<Exclude<NodeHighlight, null>, string> = {
 };
 
 const CAMERA_TARGET: WorldPoint = [0, BOARD_SURFACE_Y, 0.35];
+
+function getSafeBoardVisualNode(position: Position, context: string): BoardVisualNode | null {
+  try {
+    return getBoardVisualNode(position);
+  } catch (error) {
+    console.error(`Invalid board visual position while rendering ${context}`, position, error);
+    return null;
+  }
+}
 
 interface TacticalGrid3DProps {
   nodes: BoardVisualNode[];
@@ -99,7 +109,7 @@ const TacticalGrid3D: React.FC<TacticalGrid3DProps> = ({
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const temporaryObject = useMemo(() => new THREE.Object3D(), []);
   const tileGeometry = useMemo(() => {
-    const geometry = new RoundedBoxGeometry(BOARD_CELL_SIZE - 0.07, 0.13, BOARD_CELL_SIZE - 0.07, 2, 0.028);
+    const geometry = new RoundedBoxGeometry(BOARD_CELL_SIZE - 0.026, 0.13, BOARD_CELL_SIZE - 0.026, 2, 0.018);
     const uv = geometry.getAttribute('uv');
     for (let index = 0; index < uv.count; index += 1) {
       uv.setXY(index, uv.getX(index) * 0.28 + 0.12, uv.getY(index) * 0.28 + 0.2);
@@ -495,7 +505,11 @@ function isEntityVisible(
     });
 }
 
-const ResponsiveCamera: React.FC = () => {
+interface ResponsiveCameraProps {
+  resetToken: number;
+}
+
+const ResponsiveCamera: React.FC<ResponsiveCameraProps> = ({ resetToken }) => {
   const { camera, size } = useThree();
 
   useEffect(() => {
@@ -515,7 +529,7 @@ const ResponsiveCamera: React.FC = () => {
 
     camera.lookAt(...CAMERA_TARGET);
     camera.updateProjectionMatrix();
-  }, [camera, size.height, size.width]);
+  }, [camera, resetToken, size.height, size.width]);
 
   return null;
 };
@@ -567,12 +581,21 @@ export const Board3D: React.FC = () => {
   const [hoveredTacticalNodeId, setHoveredTacticalNodeId] = useState<string | null>(null);
   const [canvasStatus, setCanvasStatus] = useState<'ready' | 'recovering' | 'lost'>('ready');
   const [canvasVersion, setCanvasVersion] = useState(0);
+  const [cameraResetToken, setCameraResetToken] = useState(0);
+  const [sceneQuality, setSceneQuality] = useState<'full' | 'reduced'>(
+    isCompactRenderer ? 'reduced' : 'full',
+  );
   const previousBoardRef = useRef<Record<string, BoardEntity>>({});
 
   const recoverCanvas = useCallback(() => {
     setCanvasStatus('recovering');
     setCanvasVersion((current) => current + 1);
+    setSceneQuality('reduced');
   }, []);
+
+  useEffect(() => {
+    if (isCompactRenderer) setSceneQuality('reduced');
+  }, [isCompactRenderer]);
 
   useEffect(() => {
     if (canvasStatus !== 'recovering') return;
@@ -673,7 +696,7 @@ export const Board3D: React.FC = () => {
     for (const reachable of getReachablePositions(
       gameState.board,
       selectedEntity.position,
-      card.movement ?? 1,
+      getMovementAllowance(gameState, selectedEntity),
       {
         allowDiagonal: true,
         canFly: card.rulesText.includes('Vuelo'),
@@ -849,8 +872,8 @@ export const Board3D: React.FC = () => {
           secondaryValue: remainingIntegrity,
           secondaryLabel: ' integridad',
           warning: preview.targetWillFall
-            ? 'El derrumbe abrira esta casilla para las rutas posteriores.'
-            : `${obstacle.description} Integridad actual: ${target.health}/${target.maxHealth}.`,
+            ? `El derrumbe abrira esta casilla. ${obstacle.destructionReward ?? ''}`.trim()
+            : `${obstacle.tacticalEffect} Integridad: ${target.health}/${target.maxHealth}.`,
         };
       }
       const warnings = [
@@ -878,6 +901,7 @@ export const Board3D: React.FC = () => {
       className="board3d-wrapper"
       data-testid="floating-sanctuary-board"
       data-canvas-status={canvasStatus}
+      data-scene-quality={sceneQuality}
       data-valid-moves={movementRoutesByKey.size}
       data-valid-move-positions={[...movementRoutesByKey.keys()].join(' ')}
     >
@@ -902,9 +926,13 @@ export const Board3D: React.FC = () => {
           onContextRestored={() => setCanvasStatus('ready')}
           onContextCreationFailed={() => setCanvasStatus('lost')}
         />
-        <ResponsiveCamera />
+        <PerformanceMonitor
+          flipflops={2}
+          onDecline={() => setSceneQuality('reduced')}
+        />
+        <ResponsiveCamera resetToken={cameraResetToken} />
         <SanctuaryMaterialsProvider enabled={useDetailedTextures}>
-          <FloatingSanctuary />
+          <FloatingSanctuary quality={sceneQuality} />
 
           <TacticalGrid3D
             nodes={BOARD_VISUAL_NODES}
@@ -920,27 +948,37 @@ export const Board3D: React.FC = () => {
           ))}
 
           {attackAnimations.map((animation) => (
-            <AttackAnimation3D
-              key={animation.id}
-              from={getBoardVisualNode(animation.from).worldPosition}
-              to={getBoardVisualNode(animation.to).worldPosition}
-              faction={animation.faction}
-              onComplete={() => {
-                setAttackAnimations((current) => current.filter((candidate) => candidate.id !== animation.id));
-              }}
-            />
+            (() => {
+              const fromNode = getSafeBoardVisualNode(animation.from, `attack animation ${animation.id} origin`);
+              const toNode = getSafeBoardVisualNode(animation.to, `attack animation ${animation.id} target`);
+              if (!fromNode || !toNode) return null;
+
+              return (
+                <AttackAnimation3D
+                  key={animation.id}
+                  from={fromNode.worldPosition}
+                  to={toNode.worldPosition}
+                  faction={animation.faction}
+                  onComplete={() => {
+                    setAttackAnimations((current) => current.filter((candidate) => candidate.id !== animation.id));
+                  }}
+                />
+              );
+            })()
           ))}
 
           {Object.values(gameState.board).map((entity) => {
             if (entity.cardId.startsWith('obstaculo-')) {
               if (!showObstacles) return null;
+              const obstacleNode = getSafeBoardVisualNode(entity.position, `obstacle ${entity.id}`);
+              if (!obstacleNode) return null;
               return (
                 <SanctuaryObstacle
                   key={entity.id}
                   entity={entity}
                   onClick={() => handleNodeClick(entity.position)}
                   onHover={(isHovered) => {
-                    setHoveredTacticalNodeId(isHovered ? getBoardVisualNode(entity.position).id : null);
+                    setHoveredTacticalNodeId(isHovered ? obstacleNode.id : null);
                     setHoveredEntity(isHovered ? entity : null);
                   }}
                 />
@@ -949,17 +987,22 @@ export const Board3D: React.FC = () => {
 
             const attackAnimation = attackAnimations.find((animation) => animation.attackerId === entity.id);
             const impactAnimation = attackAnimations.find((animation) => animation.targetId === entity.id);
+            const visualNode = getSafeBoardVisualNode(entity.position, `card ${entity.id}`);
+            if (!visualNode) return null;
+            const attackTargetNode = attackAnimation
+              ? getSafeBoardVisualNode(attackAnimation.to, `attack target for ${entity.id}`)
+              : null;
 
             return (
               <Card3D
                 key={entity.id}
                 entity={entity}
-                visualNode={getBoardVisualNode(entity.position)}
+                visualNode={visualNode}
                 isSelected={selectedEntity?.id === entity.id}
                 isHovered={hoveredEntity?.id === entity.id}
                 isHidden={!isEntityVisible(entity, gameState.board, localController)}
                 movementRoute={movementAnimationRoutes[entity.id]}
-                attackTarget={attackAnimation ? getBoardVisualNode(attackAnimation.to).worldPosition : undefined}
+                attackTarget={attackTargetNode?.worldPosition}
                 attackPulseId={attackAnimation?.id}
                 impactPulseId={impactAnimation?.id}
                 onClick={selectedEntity?.id === entity.id ? undefined : () => handleNodeClick(entity.position)}
@@ -977,14 +1020,21 @@ export const Board3D: React.FC = () => {
           })}
 
           {deathExplosions.map((explosion) => (
-            <DeathExplosion3D
-              key={explosion.id}
-              worldPosition={getBoardVisualNode(explosion.position).worldPosition}
-              faction={explosion.faction}
-              onComplete={() => {
-                setDeathExplosions((current) => current.filter((candidate) => candidate.id !== explosion.id));
-              }}
-            />
+            (() => {
+              const explosionNode = getSafeBoardVisualNode(explosion.position, `death explosion ${explosion.id}`);
+              if (!explosionNode) return null;
+
+              return (
+                <DeathExplosion3D
+                  key={explosion.id}
+                  worldPosition={explosionNode.worldPosition}
+                  faction={explosion.faction}
+                  onComplete={() => {
+                    setDeathExplosions((current) => current.filter((candidate) => candidate.id !== explosion.id));
+                  }}
+                />
+              );
+            })()
           ))}
 
           {obstacleCollapses.map((collapse) => (
@@ -997,10 +1047,16 @@ export const Board3D: React.FC = () => {
                   setObstacleCollapses((current) => current.filter((candidate) => candidate.id !== collapse.id));
                 }}
               />
-              <ObstacleCollapseBurst3D
-                worldPosition={getBoardVisualNode(collapse.entity.position).worldPosition}
-                cardId={collapse.entity.cardId}
-              />
+              {(() => {
+                const collapseNode = getSafeBoardVisualNode(collapse.entity.position, `obstacle collapse ${collapse.id}`);
+                if (!collapseNode) return null;
+                return (
+                  <ObstacleCollapseBurst3D
+                    worldPosition={collapseNode.worldPosition}
+                    cardId={collapse.entity.cardId}
+                  />
+                );
+              })()}
             </React.Fragment>
           ))}
 
@@ -1014,6 +1070,8 @@ export const Board3D: React.FC = () => {
             zoomSpeed={isCompactRenderer ? 0.85 : 1}
             minPolarAngle={0.72}
             maxPolarAngle={1.05}
+            minAzimuthAngle={-Infinity}
+            maxAzimuthAngle={Infinity}
             minDistance={isCompactRenderer ? 19 : 24}
             maxDistance={isCompactRenderer ? 35 : 36}
           />
@@ -1021,6 +1079,16 @@ export const Board3D: React.FC = () => {
       </Canvas>
 
       {tacticalPreview && <TacticalPreviewPanel {...tacticalPreview} />}
+
+      <button
+        type="button"
+        className="camera-reframe-button"
+        title="Reencuadrar tablero"
+        aria-label="Reencuadrar tablero"
+        onClick={() => setCameraResetToken((current) => current + 1)}
+      >
+        <RotateCcw size={18} aria-hidden="true" />
+      </button>
 
       {canvasStatus !== 'ready' && (
         <div className="canvas-recovery" role="alert">
@@ -1046,6 +1114,34 @@ export const Board3D: React.FC = () => {
           width: 100%;
           height: 100%;
           touch-action: none;
+        }
+        .camera-reframe-button {
+          position: absolute;
+          z-index: 28;
+          top: 18px;
+          right: 18px;
+          display: grid;
+          width: 38px;
+          height: 38px;
+          padding: 0;
+          place-items: center;
+          border: 1px solid rgba(184, 221, 238, 0.48);
+          border-radius: 6px;
+          color: #edf9ff;
+          background: rgba(7, 18, 28, 0.78);
+          box-shadow: 0 8px 22px rgba(0, 0, 0, 0.24);
+          backdrop-filter: blur(9px);
+          cursor: pointer;
+          transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+        }
+        .camera-reframe-button:hover {
+          border-color: rgba(120, 218, 255, 0.9);
+          background: rgba(14, 50, 68, 0.88);
+          transform: translateY(-1px);
+        }
+        .camera-reframe-button:focus-visible {
+          outline: 2px solid #7bdbff;
+          outline-offset: 2px;
         }
         .tactical-preview {
           position: absolute;
@@ -1125,6 +1221,10 @@ export const Board3D: React.FC = () => {
           opacity: 0.68;
         }
         @media (max-width: 1100px) {
+          .camera-reframe-button {
+            top: 8px;
+            right: 8px;
+          }
           .tactical-preview {
             top: 8px;
             left: 8px;

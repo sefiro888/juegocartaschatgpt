@@ -1,112 +1,42 @@
-import { describe, it, expect } from 'vitest';
-import { initializeGame, playManaCard, summonUnit, moveUnit, playSpell } from '../engine';
-import { getPreconstructedDeck, CARDS_DB } from '../cardsDb';
-import { executeAITurn } from '../ai';
+import { describe, expect, it } from 'vitest';
+import { GameStateSchema } from '../../types/card';
+import { DECK_CATALOG } from '../deckCatalog';
+import { executeAutomatedTurn, simulateMatch } from '../matchSimulator';
+import { getCommanderForFaction, getPreconstructedDeck } from '../cardsDb';
+import { initializeGame } from '../engine';
 
-describe('AI Battle Simulation Run', () => {
-  const seed = 'simulation-seed-456';
-  const furyDeck = getPreconstructedDeck('FURIA');
-  const arcaneDeck = getPreconstructedDeck('ARCANO');
-  
-  const commanderFury = CARDS_DB['comandante-furia'];
-  const commanderArcane = CARDS_DB['comandante-arcano'];
+describe('recorridos completos de partida', () => {
+  it('juega una partida entera sin producir estados invalidos', () => {
+    const result = simulateMatch('FURIA_EMBESTIDA', 'ARCANO_GLACIAL', 'full-match-seed', 80);
 
-  it('should run a complete multi-turn simulation between Player and AI without throwing errors', () => {
-    // ═══════════════════════════════════════════════════
-    // TURN 1: INITIALIZATION & PLAYER ACTIONS
-    // ═══════════════════════════════════════════════════
-    let state = initializeGame(furyDeck, arcaneDeck, commanderFury, commanderArcane, seed);
-    expect(state.turn).toBe(1);
-    expect(state.activePlayer).toBe('PLAYER');
-    
-    // Player plays a mana source
-    state.player.hand.unshift({ ...CARDS_DB['fuente-furia'] });
-    state = playManaCard(state, 'PLAYER', 'fuente-furia');
-    expect(state.player.manaSources.furia.total).toBe(1);
-    expect(state.player.manaPlayedThisTurn).toBe(true);
+    expect(result.turnsPlayed).toBeGreaterThan(2);
+    expect(result.actions.mana).toBeGreaterThan(0);
+    expect(result.actions.summon).toBeGreaterThan(0);
+    expect(result.actions.move).toBeGreaterThan(0);
+    expect(result.actions.attack).toBeGreaterThan(0);
+    expect(GameStateSchema.safeParse(result.state).success).toBe(true);
+    expect(new Set(Object.values(result.state.board).map((entity) => entity.id)).size)
+      .toBe(Object.keys(result.state.board).length);
+  });
 
-    // Give player more mana directly to summon units for test
-    state.player.manaSources.furia.total = 3;
-    state.player.manaSources.furia.spent = 0;
+  it.each(DECK_CATALOG)('el mazo $name completa 12 rondas sin bloquearse', ({ id, commanderFaction }) => {
+    const opponent = id === 'ARCANO_GLACIAL' ? 'FURIA_EMBESTIDA' : 'ARCANO_GLACIAL';
+    const opponentDefinition = DECK_CATALOG.find((deck) => deck.id === opponent);
+    if (!opponentDefinition) throw new Error(`No existe el mazo rival ${opponent}.`);
 
-    // Player summons Sabueso de Brasa (2/1) on (1, 0)
-    const hound = { ...CARDS_DB['sabueso-brasa'] };
-    state.player.hand.unshift(hound);
-    state = summonUnit(state, 'PLAYER', hound.id, { x: 1, y: 0 });
-    expect(state.board["1,0"]).toBeDefined();
-    expect(state.board["1,0"].cardId).toBe('sabueso-brasa');
+    let state = initializeGame(
+      getPreconstructedDeck(id),
+      getPreconstructedDeck(opponent),
+      getCommanderForFaction(commanderFaction),
+      getCommanderForFaction(opponentDefinition.commanderFaction),
+      `smoke-${id}`,
+    );
 
-    // Player ends turn -> transitions to AI
-    state.activePlayer = 'OPPONENT';
-    
-    // ═══════════════════════════════════════════════════
-    // TURN 1: AI (OPPONENT) ACTIONS
-    // ═══════════════════════════════════════════════════
-    // Make sure opponent has mana and cards to play
-    state.opponent.manaSources.arcano.total = 3;
-    state.opponent.manaSources.arcano.spent = 0;
-    state.opponent.hand.unshift({ ...CARDS_DB['fuente-arcano'] });
-    state.opponent.hand.unshift({ ...CARDS_DB['tejedora-escarcha'] });
+    for (let turn = 0; turn < 24 && !state.winner; turn += 1) {
+      state = executeAutomatedTurn(state);
+      expect(GameStateSchema.safeParse(state).success).toBe(true);
+    }
 
-    // Run AI turn and retain the presentation timeline.
-    const observedActions: string[] = [];
-    state = executeAITurn(state, (step) => {
-      observedActions.push(step.kind);
-      expect(step.state.activePlayer).toBe('OPPONENT');
-    });
-    
-    // AI turn should play mana, summon tejedora-escarcha, and end turn
-    // (state.activePlayer returns to PLAYER, and turn count increments to 2)
-    expect(state.activePlayer).toBe('PLAYER');
-    expect(state.turn).toBe(2);
-    expect(observedActions).toContain('mana');
-    expect(observedActions).toContain('summon');
-
-    // ═══════════════════════════════════════════════════
-    // TURN 2: PLAYER ACTIONS (MOVEMENT & COMBAT)
-    // ═══════════════════════════════════════════════════
-    // Check if player's Sabueso de Brasa can move forward
-    expect(state.board["1,0"]).toBeDefined();
-    const playerUnit = state.board["1,0"];
-    expect(playerUnit.hasMovedThisTurn).toBe(false);
-
-    // Move playerUnit orthogonal from (1, 0) to (1, 1)
-    state = moveUnit(state, { x: 1, y: 0 }, { x: 1, y: 1 });
-    expect(state.board["1,0"]).toBeUndefined();
-    expect(state.board["1,1"]).toBeDefined();
-    expect(state.board["1,1"].hasMovedThisTurn).toBe(true);
-
-    // Player casts Lluvia de Ceniza on an enemy unit
-    // Force place an enemy unit at (1, 2)
-    state.board["1,2"] = {
-      id: "enemy_unit_test",
-      cardId: "tejedora-escarcha",
-      controller: 'OPPONENT',
-      position: { x: 1, y: 2 },
-      health: 3,
-      maxHealth: 3,
-      attack: 2,
-      hasMovedThisTurn: false,
-      hasAttackedThisTurn: false,
-      frozenTurns: 0,
-    };
-
-    state.player.manaSources.furia.total = 5;
-    state.player.manaSources.furia.spent = 0;
-    state.player.hand.unshift({ ...CARDS_DB['lluvia-ceniza'] });
-
-    state = playSpell(state, 'PLAYER', 'lluvia-ceniza', { x: 1, y: 2 });
-    
-    // The tejedora-escarcha at (1, 2) should have taken 3 damage and died (removed from board)
-    expect(state.board["1,2"]).toBeUndefined();
-    expect(state.opponent.graveyard.map(c => c.id)).toContain('tejedora-escarcha');
-
-    // End turn -> AI turn
-    state.activePlayer = 'OPPONENT';
-    state = executeAITurn(state);
-
-    // Verify AI resolved turn cleanly
-    expect(state.activePlayer).toBe('PLAYER');
-    expect(state.turn).toBe(3);
+    expect(state.turn).toBeGreaterThanOrEqual(2);
   });
 });

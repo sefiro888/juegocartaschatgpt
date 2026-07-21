@@ -1,17 +1,20 @@
 import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { CardDOM } from './CardDOM';
+import { CardKeywordBadges } from './CardKeywordBadges';
 import { CARDS_DB } from '../core/cardsDb';
-import type { BoardEntity, GameState } from '../types/card';
+import type { BoardEntity, Card, GameState } from '../types/card';
 import {
   ChevronDown,
   ChevronUp,
-  Flame,
   Footprints,
+  Gem,
   Heart,
   Info,
   Layers3,
+  LockKeyhole,
   Maximize2,
+  Mountain,
   Shield,
   Skull,
   Snowflake,
@@ -23,6 +26,15 @@ import {
 } from 'lucide-react';
 import { getObstacleDefinition } from '../core/obstacleConfig';
 import { isBoardObstacle } from '../core/boardPathfinding';
+import { canAffordCard } from '../core/engine';
+import {
+  MANA_TYPES,
+  factionToManaType,
+  getAvailableMana,
+  getCardFactionCosts,
+  manaTypeToFaction,
+} from '../core/factionRules';
+import { getFactionVisual } from '../core/factionVisuals';
 
 const Board3D = lazy(async () => {
   const module = await import('./board3d/Board3D');
@@ -87,9 +99,10 @@ const TerrainInspector: React.FC<{ entity: BoardEntity }> = ({ entity }) => {
 
 interface GameHUDProps {
   onQuit?: () => void;
+  tutorialMode?: boolean;
 }
 
-type ScreenFeedbackKind = 'attack' | 'damage' | 'heal' | 'freeze' | 'spell' | 'move' | 'summon' | 'defeat';
+type ScreenFeedbackKind = 'attack' | 'damage' | 'heal' | 'freeze' | 'spell' | 'move' | 'summon' | 'defeat' | 'mana' | 'terrain';
 
 interface ScreenFeedback {
   id: string;
@@ -108,10 +121,12 @@ function formatBoardPosition(entity: BoardEntity): string {
   return `${String.fromCharCode(65 + entity.position.x)}${entity.position.y + 1}`;
 }
 
-export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
+export const GameHUD: React.FC<GameHUDProps> = ({ onQuit, tutorialMode = false }) => {
   const [boardRecoveryVersion, setBoardRecoveryVersion] = useState(0);
   const [mobileInspectorOpen, setMobileInspectorOpen] = useState(false);
   const [mobileHandOpen, setMobileHandOpen] = useState(false);
+  const [desktopHandOpen, setDesktopHandOpen] = useState(true);
+  const [tutorialVisible, setTutorialVisible] = useState(tutorialMode);
   const [screenFeedbacks, setScreenFeedbacks] = useState<ScreenFeedback[]>([]);
   const stateRecoveryAttempted = useRef(false);
   const previousGameStateRef = useRef<GameState | null>(null);
@@ -158,6 +173,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
   const turn = gameState?.turn || 0;
   const activePlayer = gameState?.activePlayer || 'PLAYER';
   const isPlayerTurn = activePlayer === localController;
+
+  useEffect(() => {
+    setTutorialVisible(tutorialMode);
+  }, [tutorialMode]);
 
   useEffect(() => {
     if (gameState || stateRecoveryAttempted.current) return;
@@ -221,6 +240,14 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
           title: 'INVOCACION',
           detail: latestEvent.text,
         });
+      } else if (latestEvent.tone === 'mana') {
+        nextFeedbacks.push({
+          id: `${feedbackSeed}-mana`,
+          kind: 'mana',
+          title: 'FUENTE ACTIVADA',
+          detail: latestEvent.text,
+          value: '+1',
+        });
       }
       previousEventIdRef.current = latestEvent.id;
     }
@@ -280,12 +307,15 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
 
       for (const entity of previousEntities.values()) {
         if (currentEntities.has(entity.id)) continue;
+        const obstacle = isBoardObstacle(entity) ? getObstacleDefinition(entity.cardId) : null;
         nextFeedbacks.push({
           id: `${feedbackSeed}-defeat-${entity.id}`,
-          kind: 'defeat',
-          title: getEntityCardName(entity),
-          detail: isBoardObstacle(entity) ? 'Obstaculo destruido' : 'Unidad derrotada',
-          value: `-${Math.max(1, entity.health)}`,
+          kind: obstacle ? 'terrain' : 'defeat',
+          title: obstacle ? 'RUTA DESPEJADA' : getEntityCardName(entity),
+          detail: obstacle
+            ? `${obstacle.name}. ${obstacle.destructionReward ?? 'La casilla queda libre.'}`
+            : 'Unidad derrotada',
+          value: obstacle ? 'RUTA' : `-${Math.max(1, entity.health)}`,
         });
       }
     }
@@ -379,8 +409,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
   };
 
   const handleRestart = () => {
-    const playerFaction = playerCommanderCard.faction === 'FURIA' ? 'FURIA' : 'ARCANO';
-    startNewGame(playerFaction);
+    startNewGame(playerCommanderCard.faction);
   };
 
   const handleEndTurn = () => {
@@ -393,25 +422,93 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
   };
 
   /** Render mana orbs (colored circles) */
-  const renderManaOrbs = (available: number, total: number, faction: 'furia' | 'arcano') => {
+  const renderManaOrbs = (available: number, total: number, manaType: (typeof MANA_TYPES)[number]) => {
+    const visual = getFactionVisual(manaTypeToFaction(manaType));
     const orbs = [];
     for (let i = 0; i < total; i++) {
       orbs.push(
         <div
           key={i}
-          className={`mana-orb ${faction} ${i < available ? 'active' : 'spent'}`}
+          className={`mana-orb ${visual.className} ${i < available ? 'active' : 'spent'}`}
+          style={i < available ? {
+            background: visual.accent,
+            boxShadow: `0 0 7px ${visual.accent}`,
+          } : undefined}
         />
       );
     }
     return <div className="mana-orbs-row">{orbs}</div>;
   };
 
-  const playerFuriaAvail = player.manaSources.furia.total - player.manaSources.furia.spent;
-  const playerArcanoAvail = player.manaSources.arcano.total - player.manaSources.arcano.spent;
-  const oppFuriaAvail = opponent.manaSources.furia.total - opponent.manaSources.furia.spent;
-  const oppArcanoAvail = opponent.manaSources.arcano.total - opponent.manaSources.arcano.spent;
+  const getRelevantManaTypes = (owner: GameState['player']) => {
+    const cards = [...owner.hand, ...owner.deck, ...owner.graveyard];
+    return MANA_TYPES.filter((manaType) =>
+      owner.manaSources[manaType].total > 0 ||
+      cards.some((card) => card.type === 'MANA' && factionToManaType(card.faction) === manaType)
+    );
+  };
+  const playerManaTypes = getRelevantManaTypes(player);
+  const opponentManaTypes = getRelevantManaTypes(opponent);
+
+  const getHandCardAvailability = (card: Card) => {
+    if (!isPlayerTurn) {
+      return { state: 'waiting' as const, label: 'Turno rival', detail: 'Disponible cuando comience tu turno.' };
+    }
+    if (card.type === 'MANA') {
+      return player.manaPlayedThisTurn
+        ? { state: 'blocked' as const, label: 'Fuente usada', detail: 'Ya has activado una fuente este turno.' }
+        : { state: 'ready' as const, label: 'Lista', detail: 'Fuente de maná disponible.' };
+    }
+    return canAffordCard(gameState, localController, card)
+      ? { state: 'ready' as const, label: 'Lista', detail: 'Coste disponible. Sus destinos válidos se mostrarán al seleccionarla.' }
+      : { state: 'blocked' as const, label: 'Falta maná', detail: 'No tienes suficiente maná disponible para pagar esta carta.' };
+  };
+
+  const selectedCardAvailability = selectedCardInHand
+    ? getHandCardAvailability(selectedCardInHand)
+    : null;
 
   const activeScreenFeedback = screenFeedbacks[0];
+  const tutorialObjectives = [
+    {
+      id: 'mana',
+      label: 'Activa una fuente de mana',
+      detail: 'Juega una Fuente de Furia desde tu mano.',
+      complete: gameEvents.some((event) => event.tone === 'mana'),
+    },
+    {
+      id: 'summon',
+      label: 'Invoca una unidad',
+      detail: 'Selecciona una unidad pagable y elige una casilla valida.',
+      complete: gameEvents.some((event) => event.tone === 'summon'),
+    },
+    {
+      id: 'move',
+      label: 'Mueve una carta',
+      detail: 'Selecciona tu unidad y avanza por una ruta iluminada.',
+      complete: gameEvents.some((event) => event.tone === 'move'),
+    },
+    {
+      id: 'attack',
+      label: 'Realiza un ataque',
+      detail: 'Selecciona una unidad lista y despues un objetivo rojo.',
+      complete: gameEvents.some((event) => event.tone === 'attack'),
+    },
+    {
+      id: 'terrain',
+      label: 'Abre una ruta',
+      detail: 'Derriba un obstaculo para liberar su casilla y obtener su recompensa.',
+      complete: gameEvents.some((event) => event.text.toLocaleLowerCase('es').includes('derriba')),
+    },
+    {
+      id: 'victory',
+      label: 'Derriba el Nexo rival',
+      detail: 'Reduce a 0 la vida del comandante enemigo.',
+      complete: gameState.winner === localController,
+    },
+  ];
+  const currentTutorialObjective = tutorialObjectives.find((objective) => !objective.complete);
+  const tutorialCompletedCount = tutorialObjectives.filter((objective) => objective.complete).length;
   const feedbackIcon = activeScreenFeedback?.kind === 'attack'
     ? <Swords size={24} />
     : activeScreenFeedback?.kind === 'spell'
@@ -420,14 +517,18 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
         ? <Snowflake size={24} />
         : activeScreenFeedback?.kind === 'move'
           ? <Footprints size={24} />
-          : activeScreenFeedback?.kind === 'heal'
+      : activeScreenFeedback?.kind === 'heal'
             ? <Heart size={24} />
+            : activeScreenFeedback?.kind === 'mana'
+              ? <Gem size={24} />
+              : activeScreenFeedback?.kind === 'terrain'
+                ? <Mountain size={24} />
             : activeScreenFeedback?.kind === 'summon'
               ? <Shield size={24} />
               : <Swords size={24} />;
 
   return (
-    <div className={`game-hud ${mobileHandOpen ? 'mobile-hand-open' : 'mobile-hand-closed'}`}>
+    <div className={`game-hud ${mobileHandOpen ? 'mobile-hand-open' : 'mobile-hand-closed'} ${desktopHandOpen ? 'desktop-hand-open' : 'desktop-hand-closed'}`}>
       {/* ═══ TOP BAR: OPPONENT INFO | TURN/PHASE | OPP MANA ═══ */}
       <div className="hud-top-bar glass-panel">
         <div className="top-section opponent-info-compact">
@@ -454,19 +555,24 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
                   ? '⚔️ Tu Turno'
                   : onlineSession ? 'Esperando al rival...' : '🤖 IA Pensando...'}
           </span>
+          <span className="victory-objective" title="La partida termina cuando cae el comandante rival">
+            <Skull size={11} /> Derriba el Nexo rival · {opponentHealth} PV
+          </span>
         </div>
 
         <div className="top-section opponent-mana-compact">
-          <div className="mana-compact-group">
-            <span className="mana-compact-label arcano-text">❄️</span>
-            {renderManaOrbs(oppArcanoAvail, opponent.manaSources.arcano.total, 'arcano')}
-            <span className="mana-compact-num">{oppArcanoAvail}/{opponent.manaSources.arcano.total}</span>
-          </div>
-          <div className="mana-compact-group">
-            <span className="mana-compact-label furia-text">🔥</span>
-            {renderManaOrbs(oppFuriaAvail, opponent.manaSources.furia.total, 'furia')}
-            <span className="mana-compact-num">{oppFuriaAvail}/{opponent.manaSources.furia.total}</span>
-          </div>
+          {opponentManaTypes.map((manaType) => {
+            const source = opponent.manaSources[manaType];
+            const available = getAvailableMana(opponent.manaSources, manaType);
+            const visual = getFactionVisual(manaTypeToFaction(manaType));
+            return (
+              <div className="mana-compact-group" key={manaType} title={`Mana de ${manaType}`}>
+                <span className="mana-compact-label" style={{ color: visual.accent }}>{visual.icon}</span>
+                {renderManaOrbs(available, source.total, manaType)}
+                <span className="mana-compact-num">{available}/{source.total}</span>
+              </div>
+            );
+          })}
           <button
             type="button"
             className={`sound-toggle ${soundEnabled ? 'is-active' : ''}`}
@@ -483,6 +589,28 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
         <div className="online-sync-error" role="alert">
           {onlineError}
         </div>
+      )}
+
+      {tutorialMode && tutorialVisible && (
+        <aside className="tutorial-coach" aria-live="polite">
+          <button
+            type="button"
+            className="tutorial-close"
+            onClick={() => setTutorialVisible(false)}
+            aria-label="Cerrar tutorial"
+            title="Cerrar tutorial"
+          >
+            <X size={15} aria-hidden="true" />
+          </button>
+          <div className="tutorial-kicker">ENTRENAMIENTO {tutorialCompletedCount}/{tutorialObjectives.length}</div>
+          <strong>{currentTutorialObjective?.label ?? 'Tutorial completado'}</strong>
+          <p>{currentTutorialObjective?.detail ?? 'Ya conoces el ciclo completo de una partida.'}</p>
+          <div className="tutorial-progress" aria-label={`${tutorialCompletedCount} de ${tutorialObjectives.length} objetivos completados`}>
+            {tutorialObjectives.map((objective) => (
+              <span key={objective.id} className={objective.complete ? 'is-complete' : ''} />
+            ))}
+          </div>
+        </aside>
       )}
 
       {activeScreenFeedback && (
@@ -622,6 +750,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
                   </div>
                   <div className="rules-box">
                     <p className="rules-title">Reglas Especiales</p>
+                    <CardKeywordBadges rulesText={CARDS_DB[hoveredEntity.cardId]?.rulesText ?? ''} />
                     <p className="rules-desc">{CARDS_DB[hoveredEntity.cardId]?.rulesText}</p>
                   </div>
                   <div className="lore-box-sidebar">
@@ -679,6 +808,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
                   </div>
                   <div className="rules-box">
                     <p className="rules-title">Reglas Especiales</p>
+                    <CardKeywordBadges rulesText={CARDS_DB[selectedEntity.cardId]?.rulesText ?? ''} />
                     <p className="rules-desc">{CARDS_DB[selectedEntity.cardId]?.rulesText}</p>
                   </div>
                   <div className="lore-box-sidebar">
@@ -699,12 +829,26 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
               )
             ) : selectedCardInHand ? (
               <div className="sidebar-card-info animated-fade">
+                {selectedCardAvailability && (
+                  <div className={`hand-action-status ${selectedCardAvailability.state}`}>
+                    {selectedCardAvailability.state === 'ready'
+                      ? <Sparkles size={16} aria-hidden="true" />
+                      : <LockKeyhole size={16} aria-hidden="true" />}
+                    <div>
+                      <span>Disponibilidad</span>
+                      <strong>{selectedCardAvailability.label}</strong>
+                      <small>{selectedCardAvailability.detail}</small>
+                    </div>
+                  </div>
+                )}
                 <div className="inspected-card-preview hand-card-preview">
                   <CardDOM
                     card={selectedCardInHand}
                     mode="hand"
                     isSelected
-                    isPlayable={isPlayerTurn}
+                    isPlayable={selectedCardAvailability?.state === 'ready'}
+                    availability={selectedCardAvailability?.state}
+                    availabilityLabel={selectedCardAvailability?.label}
                   />
                 </div>
                 <h4>{selectedCardInHand.name}</h4>
@@ -728,6 +872,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
                     <span className="spec-pill">❤️ HP: {selectedCardInHand.maxHealth}</span>
                   )}
                 </div>
+                <CardKeywordBadges rulesText={selectedCardInHand.rulesText} />
                 <p className="rules-desc-sidebar">{selectedCardInHand.rulesText}</p>
                 <div className="lore-box-sidebar hand-lore">
                   <p className="lore-desc">"{selectedCardInHand.flavorText}"</p>
@@ -764,6 +909,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
                 <div key={entry.id} className={`action-log-entry tone-${entry.tone}`}>
                   {entry.text}
                 </div>
+
               ))
             )}
           </div>
@@ -785,6 +931,19 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
 
       {/* ═══ BOTTOM BAR: PLAYER STATS | HAND | MANA ═══ */}
       <div className={`hud-bottom-bar glass-panel ${isAIThinking ? 'ai-thinking-dim' : ''}`}>
+        <button
+          type="button"
+          className="desktop-hand-toggle"
+          onClick={() => setDesktopHandOpen((current) => !current)}
+          aria-expanded={desktopHandOpen}
+          aria-label={desktopHandOpen ? 'Ocultar mano' : 'Mostrar mano'}
+          title={desktopHandOpen ? 'Ocultar mano' : 'Mostrar mano'}
+        >
+          {desktopHandOpen ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+          <span>{desktopHandOpen ? 'Ocultar mano' : 'Abrir mano'}</span>
+          <strong>{player.hand.length}</strong>
+        </button>
+
         <button
           type="button"
           className="mobile-hand-toggle"
@@ -832,30 +991,32 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
               <span className="mobile-health-summary" title="Vida del Nexo"><Heart size={13} /> {playerHealth}/25</span>
               <span className="mobile-deck-summary" title="Cartas en el mazo"><Layers3 size={13} /> {player.deck.length}</span>
               <span className="mobile-graveyard-summary" title="Cartas en el cementerio"><Skull size={13} /> {player.graveyard.length}</span>
-              <span className="mobile-mana-summary arcano-text" title="Mana Arcano"><Snowflake size={13} /> {playerArcanoAvail}/{player.manaSources.arcano.total}</span>
-              <span className="mobile-mana-summary furia-text" title="Mana de Furia"><Flame size={13} /> {playerFuriaAvail}/{player.manaSources.furia.total}</span>
+              {playerManaTypes.map((manaType) => {
+                const visual = getFactionVisual(manaTypeToFaction(manaType));
+                return (
+                  <span
+                    className="mobile-mana-summary"
+                    title={`Mana de ${manaType}`}
+                    style={{ color: visual.accent }}
+                    key={manaType}
+                  >
+                    {visual.icon} {getAvailableMana(player.manaSources, manaType)}/{player.manaSources[manaType].total}
+                  </span>
+                );
+              })}
             </div>
           </div>
           <div className="player-hand-scroll">
             {player.hand.map((card, idx) => {
               const isSelected = selectedCardInHand?.id === card.id;
-              const isPlayable = isPlayerTurn && (
-                card.type === 'MANA' ? !player.manaPlayedThisTurn : (
-                  (card.cost.furia || 0) <= (player.manaSources.furia.total - player.manaSources.furia.spent) &&
-                  (card.cost.arcano || 0) <= (player.manaSources.arcano.total - player.manaSources.arcano.spent) &&
-                  card.cost.generic <= (
-                    (player.manaSources.furia.total - player.manaSources.furia.spent) +
-                    (player.manaSources.arcano.total - player.manaSources.arcano.spent) -
-                    (card.cost.furia || 0) - (card.cost.arcano || 0)
-                  )
-                )
-              );
+              const availability = getHandCardAvailability(card);
+              const isPlayable = availability.state === 'ready';
 
               return (
                 <button
                   type="button"
                   key={`${card.id}-${idx}`}
-                  className={`hand-card-wrapper ${isSelected ? 'is-selected' : ''} ${isPlayable ? 'is-playable' : ''}`}
+                  className={`hand-card-wrapper availability-${availability.state} ${isSelected ? 'is-selected' : ''} ${isPlayable ? 'is-playable' : ''}`}
                   style={{
                     '--hand-rotation': `${(idx - (player.hand.length - 1) / 2) * 1.1}deg`,
                     '--hand-offset': `${Math.abs(idx - (player.hand.length - 1) / 2) * 2}px`,
@@ -872,31 +1033,46 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
                   }}
                   onDoubleClick={() => setInspectedCard(card)}
                   aria-label={`${isSelected ? 'Deseleccionar' : 'Seleccionar'} ${card.name}`}
-                  title="Doble clic para ver la carta completa"
+                  title={`${availability.detail} Doble clic para ver la carta completa.`}
                 >
-                  <CardDOM card={card} mode="hand" isSelected={isSelected} isPlayable={isPlayable} />
+                  <CardDOM
+                    card={card}
+                    mode="hand"
+                    isSelected={isSelected}
+                    isPlayable={isPlayable}
+                    availability={availability.state}
+                    availabilityLabel={availability.label}
+                  />
                 </button>
               );
             })}
           </div>
         </div>
 
+        <div className="desktop-hand-collapsed-summary" aria-hidden={desktopHandOpen}>
+          <span className="hand-stage-title">MANO OCULTA</span>
+          <span className="hand-stage-count">{player.hand.length} CARTAS</span>
+        </div>
+
         {/* MANA ORB TRACKERS (RIGHT) */}
         <div className="player-mana-panel">
-          <div className="mana-orb-group">
-            <div className="mana-orb-header">
-              <span className="mana-orb-icon arcano-text">❄️ Arcano</span>
-              <span className="mana-orb-count">{playerArcanoAvail}/{player.manaSources.arcano.total}</span>
-            </div>
-            {renderManaOrbs(playerArcanoAvail, player.manaSources.arcano.total, 'arcano')}
-          </div>
-          <div className="mana-orb-group">
-            <div className="mana-orb-header">
-              <span className="mana-orb-icon furia-text">🔥 Furia</span>
-              <span className="mana-orb-count">{playerFuriaAvail}/{player.manaSources.furia.total}</span>
-            </div>
-            {renderManaOrbs(playerFuriaAvail, player.manaSources.furia.total, 'furia')}
-          </div>
+          {playerManaTypes.map((manaType) => {
+            const source = player.manaSources[manaType];
+            const available = getAvailableMana(player.manaSources, manaType);
+            const faction = manaTypeToFaction(manaType);
+            const visual = getFactionVisual(faction);
+            return (
+              <div className="mana-orb-group" key={manaType}>
+                <div className="mana-orb-header">
+                  <span className="mana-orb-icon" style={{ color: visual.accent }}>
+                    {visual.icon} {faction.charAt(0) + faction.slice(1).toLowerCase()}
+                  </span>
+                  <span className="mana-orb-count">{available}/{source.total}</span>
+                </div>
+                {renderManaOrbs(available, source.total, manaType)}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -960,7 +1136,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
               <p className="card-inspection-type">{inspectedCard.subtype || inspectedCard.type}</p>
 
               <div className="card-inspection-stats">
-                <span>Coste {inspectedCard.cost.generic + (inspectedCard.cost.furia || 0) + (inspectedCard.cost.arcano || 0)}</span>
+                <span>Coste {inspectedCard.cost.generic + getCardFactionCosts(inspectedCard).reduce((total, cost) => total + cost.amount, 0)}</span>
                 {inspectedCard.attack !== undefined && <span>ATK {inspectedCard.attack}</span>}
                 {inspectedCard.maxHealth !== undefined && <span>HP {inspectedCard.maxHealth}</span>}
                 {inspectedCard.range !== undefined && <span>Rango {inspectedCard.range}</span>}
@@ -969,6 +1145,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
 
               <section className="card-inspection-section">
                 <h3>Reglas</h3>
+                <CardKeywordBadges rulesText={inspectedCard.rulesText} />
                 <p>{inspectedCard.rulesText}</p>
               </section>
 
@@ -1024,6 +1201,68 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
           pointer-events: none;
           transform: translate(-50%, -50%);
           animation: screen-feedback-in 1.65s cubic-bezier(0.2, 0.85, 0.25, 1) both;
+        }
+
+        .tutorial-coach {
+          position: fixed;
+          z-index: 48;
+          top: 70px;
+          right: 276px;
+          width: 286px;
+          padding: 13px 38px 12px 14px;
+          border: 1px solid rgba(127, 211, 239, 0.42);
+          border-radius: 7px;
+          color: #edfaff;
+          background: rgba(7, 20, 31, 0.9);
+          box-shadow: 0 16px 38px rgba(0, 0, 0, 0.34);
+          backdrop-filter: blur(12px);
+        }
+        .tutorial-close {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          display: grid;
+          width: 24px;
+          height: 24px;
+          padding: 0;
+          place-items: center;
+          border: 0;
+          border-radius: 4px;
+          color: #a9c7d5;
+          background: transparent;
+          cursor: pointer;
+        }
+        .tutorial-close:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+        .tutorial-kicker {
+          color: #7edbff;
+          font-size: 0.6rem;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+        }
+        .tutorial-coach > strong {
+          display: block;
+          margin-top: 4px;
+          font: 800 0.86rem var(--font-display);
+        }
+        .tutorial-coach > p {
+          margin: 4px 0 9px;
+          color: #b7cbd5;
+          font-size: 0.69rem;
+          line-height: 1.4;
+        }
+        .tutorial-progress {
+          display: grid;
+          grid-template-columns: repeat(6, 1fr);
+          gap: 4px;
+        }
+        .tutorial-progress span {
+          height: 3px;
+          border-radius: 2px;
+          background: rgba(151, 185, 201, 0.18);
+        }
+        .tutorial-progress span.is-complete {
+          background: #5ed6aa;
+          box-shadow: 0 0 8px rgba(79, 224, 172, 0.36);
         }
 
         .screen-action-icon {
@@ -1082,8 +1321,20 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
         }
 
         .feedback-move .screen-action-value,
-        .feedback-summon .screen-action-value {
+        .feedback-summon .screen-action-value,
+        .feedback-mana .screen-action-value,
+        .feedback-terrain .screen-action-value {
           color: #8ee7c5;
+        }
+
+        .feedback-mana .screen-action-icon {
+          color: #81dcff;
+          border-color: rgba(87, 203, 255, 0.58);
+        }
+
+        .feedback-terrain .screen-action-icon {
+          color: #ffd08a;
+          border-color: rgba(228, 180, 105, 0.56);
         }
 
         @keyframes screen-feedback-in {
@@ -1170,7 +1421,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
         /* Turn indicator with pulsing dot */
         .game-status-center {
           flex-direction: column;
-          gap: 2px;
+          gap: 1px;
         }
         .turn-indicator {
           display: flex;
@@ -1212,6 +1463,15 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
           color: var(--color-danger);
           border: 1px solid rgba(239, 68, 68, 0.25);
           animation: glow-pulse 2s infinite;
+        }
+        .victory-objective {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          color: #c5d4dd;
+          font-size: 0.58rem;
+          font-weight: 700;
+          text-transform: uppercase;
         }
 
         .online-sync-error {
@@ -1768,6 +2028,76 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
           cursor: not-allowed;
         }
 
+        .hand-action-status {
+          display: grid;
+          grid-template-columns: 28px minmax(0, 1fr);
+          gap: 9px;
+          align-items: center;
+          width: 100%;
+          padding: 9px 10px;
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 7px;
+          color: #dce8ef;
+          background: rgba(8, 16, 24, 0.78);
+          box-sizing: border-box;
+        }
+
+        .hand-action-status > svg {
+          width: 28px;
+          height: 28px;
+          padding: 6px;
+          border-radius: 8px;
+          background: rgba(255,255,255,0.06);
+          box-sizing: border-box;
+        }
+
+        .hand-action-status > div {
+          display: grid;
+          min-width: 0;
+          gap: 2px;
+        }
+
+        .hand-action-status span {
+          color: #8195a3;
+          font-size: 0.54rem;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+
+        .hand-action-status strong {
+          font-size: 0.76rem;
+          line-height: 1.1;
+        }
+
+        .hand-action-status small {
+          color: #9dafba;
+          font-size: 0.62rem;
+          line-height: 1.3;
+        }
+
+        .hand-action-status.ready {
+          border-color: rgba(77, 226, 168, 0.3);
+          color: #bff9df;
+          background: linear-gradient(135deg, rgba(8, 68, 51, 0.7), rgba(8, 25, 25, 0.78));
+        }
+
+        .hand-action-status.ready > svg {
+          color: #69e5b2;
+          background: rgba(50, 211, 150, 0.12);
+        }
+
+        .hand-action-status.blocked {
+          border-color: rgba(255, 105, 82, 0.28);
+          color: #ffd0c8;
+          background: linear-gradient(135deg, rgba(78, 22, 19, 0.72), rgba(29, 14, 17, 0.8));
+        }
+
+        .hand-action-status.waiting {
+          color: #b7c5ce;
+          background: rgba(22, 31, 40, 0.8);
+        }
+
         .sidebar-placeholder {
           display: flex;
           flex-direction: column;
@@ -1897,8 +2227,88 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
           align-items: end;
           background: linear-gradient(0deg, rgba(3, 9, 16, 0.98) 0%, rgba(5, 15, 24, 0.93) 56%, rgba(8, 20, 31, 0.42) 100%);
           box-shadow: 0 -12px 34px rgba(1, 7, 13, 0.28), inset 0 1px 0 rgba(223, 245, 255, 0.05);
-          transition: filter 0.4s;
+          transition: height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+                      min-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+                      padding 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+                      filter 0.4s;
           isolation: isolate;
+          box-sizing: border-box;
+        }
+
+        .desktop-hand-toggle {
+          position: absolute;
+          z-index: 5;
+          top: -42px;
+          left: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          min-width: 160px;
+          height: 42px;
+          padding: 0 15px;
+          border: 1px solid rgba(139, 221, 255, 0.34);
+          border-bottom: 0;
+          border-radius: 10px 10px 0 0;
+          color: #dff7ff;
+          background: linear-gradient(180deg, rgba(13, 43, 58, 0.96), rgba(5, 18, 29, 0.96));
+          box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.28), inset 0 1px rgba(255, 255, 255, 0.08);
+          backdrop-filter: blur(14px);
+          transform: translateX(-50%);
+          font: 800 0.72rem var(--font-sans);
+          cursor: pointer;
+        }
+
+        .desktop-hand-toggle:hover {
+          border-color: rgba(139, 221, 255, 0.58);
+          color: #ffffff;
+          background: linear-gradient(180deg, rgba(20, 68, 92, 0.98), rgba(7, 25, 40, 0.98));
+        }
+
+        .desktop-hand-toggle strong {
+          min-width: 24px;
+          height: 24px;
+          display: grid;
+          place-items: center;
+          border: 1px solid rgba(123, 220, 255, 0.34);
+          border-radius: 50%;
+          color: #fff;
+          background: rgba(53, 160, 201, 0.2);
+          font-size: 0.7rem;
+        }
+
+        .desktop-hand-collapsed-summary {
+          display: none;
+        }
+
+        .game-hud.desktop-hand-closed .hud-bottom-bar {
+          height: 104px;
+          min-height: 104px;
+          padding: 12px 26px 14px;
+          align-items: center;
+          background: linear-gradient(0deg, rgba(3, 9, 16, 0.98) 0%, rgba(5, 15, 24, 0.88) 72%, rgba(8, 20, 31, 0.18) 100%);
+        }
+
+        .game-hud.desktop-hand-closed .player-hand-container {
+          display: none;
+        }
+
+        .game-hud.desktop-hand-closed .desktop-hand-collapsed-summary {
+          display: flex;
+          min-height: 64px;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          border: 1px solid rgba(139, 221, 255, 0.16);
+          border-radius: 10px;
+          background: rgba(9, 25, 38, 0.62);
+          box-shadow: inset 0 1px 0 rgba(231, 250, 255, 0.05);
+        }
+
+        .game-hud.desktop-hand-closed .player-stats-panel,
+        .game-hud.desktop-hand-closed .player-mana-panel {
+          align-self: center;
+          margin-bottom: 0;
         }
 
         .hud-bottom-bar.ai-thinking-dim {
@@ -2010,6 +2420,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
           background: linear-gradient(180deg, rgba(17, 39, 52, 0.78), rgba(5, 14, 23, 0.9));
           box-shadow: inset 0 1px 0 rgba(231, 250, 255, 0.05), 0 14px 28px rgba(0, 0, 0, 0.22);
           position: relative;
+          box-sizing: border-box;
         }
         .player-hand-container::before {
           content: '';
@@ -2255,6 +2666,71 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
           box-shadow: inset 0 1px 0 rgba(236, 246, 255, 0.05), 0 8px 18px rgba(0, 0, 0, 0.2);
           backdrop-filter: blur(12px);
         }
+
+        @media (min-width: 1101px) {
+          .hud-bottom-bar {
+            grid-template-columns: minmax(190px, 1fr) minmax(760px, 1120px) minmax(190px, 1fr);
+            gap: 22px;
+            height: 330px;
+            min-height: 330px;
+          }
+
+          .player-stats-panel {
+            width: 190px;
+            justify-self: end;
+          }
+
+          .player-mana-panel {
+            width: 190px;
+            justify-self: start;
+          }
+
+          .player-hand-container {
+            width: 100%;
+            max-width: 1120px;
+            justify-self: center;
+          }
+
+          .player-hand-scroll {
+            justify-content: safe center;
+            gap: clamp(12px, 1vw, 20px);
+            padding-top: 8px;
+          }
+
+          .player-hand-scroll .mode-hand {
+            width: clamp(172px, 9.3vw, 186px);
+            height: clamp(246px, 13vw, 260px);
+          }
+
+          .hand-card-wrapper:hover {
+            transform: translateY(-13px) rotate(0deg) scale(1.045);
+          }
+
+          .hand-card-wrapper.is-selected {
+            transform: translateY(-15px) rotate(0deg) scale(1.045);
+          }
+        }
+
+        @media (min-width: 1600px) {
+          .hud-top-bar {
+            height: 64px;
+            min-height: 64px;
+            padding: 10px 24px 17px;
+          }
+
+          .top-section { gap: 12px; }
+          .opponent-info-compact,
+          .commander-tag { font-size: 0.9rem; }
+          .nexo-health-bar-mini { width: 118px; height: 21px; }
+          .nexo-bar-text { font-size: 0.75rem; }
+          .resource-badge { font-size: 0.84rem; }
+          .turn-label { font-size: 0.94rem; }
+          .phase-tag { font-size: 0.75rem; padding: 3px 9px; }
+          .victory-objective { font-size: 0.65rem; }
+          .mana-compact-label,
+          .mana-compact-num { font-size: 0.78rem; }
+          .sound-toggle { width: 34px; height: 34px; }
+        }
         .mana-orb-group {
           display: flex;
           flex-direction: column;
@@ -2378,6 +2854,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
         }
 
         @media (max-width: 1100px) {
+          .tutorial-coach {
+            top: 61px;
+            right: 8px;
+            width: min(286px, calc(100vw - 16px));
+          }
           .game-hud {
             --mobile-hand-collapsed-height: 70px;
             --mobile-hand-open-height: 252px;
@@ -2389,6 +2870,15 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit }) => {
 
           .game-hud.mobile-hand-open {
             --mobile-hand-height: var(--mobile-hand-open-height);
+          }
+
+          .desktop-hand-toggle,
+          .game-hud.desktop-hand-closed .desktop-hand-collapsed-summary {
+            display: none;
+          }
+
+          .game-hud.desktop-hand-closed .player-hand-container {
+            display: flex;
           }
 
           .hud-top-bar {

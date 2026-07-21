@@ -1,4 +1,5 @@
-import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+import { Component, lazy, Suspense, useEffect, useState, type ErrorInfo, type ReactNode } from 'react';
+import { BookOpenCheck } from 'lucide-react';
 import { DECK_CATALOG, type DeckDefinition } from './core/deckCatalog';
 
 const Gallery = lazy(async () => {
@@ -82,6 +83,10 @@ class ViewErrorBoundary extends Component<
     return { hasError: true };
   }
 
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('ViewErrorBoundary captured an error', error, errorInfo);
+  }
+
   render() {
     if (this.state.hasError) {
       return (
@@ -133,20 +138,44 @@ const MenuParticles = () => {
 
 function App() {
   const [view, setView] = useState<ViewMode>('menu');
+  const [tutorialMode, setTutorialMode] = useState(false);
   const [viewRecoveryVersion, setViewRecoveryVersion] = useState(0);
   const navigateTo = (target: ViewMode) => {
     setView(target);
   };
 
   useEffect(() => {
-    if (!new URLSearchParams(window.location.search).get('sala')) return;
-    void loadGameHUD();
-    setView('online-lobby');
+    const invitedRoomCode = new URLSearchParams(window.location.search).get('sala');
+    if (invitedRoomCode) {
+      void loadGameHUD();
+      setView('online-lobby');
+      return;
+    }
+
+    let cancelled = false;
+    void loadGameStore().then(async ({ useGameStore }) => {
+      const resumed = await useGameStore.getState().resumeOnlineGame();
+      if (!resumed || cancelled) return;
+      void loadGameHUD();
+      const status = useGameStore.getState().onlineSession?.status;
+      setView(status === 'waiting' ? 'online-lobby' : 'game');
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleSelectDeck = async (deck: DeckDefinition) => {
     const [, { useGameStore }] = await Promise.all([loadGameHUD(), loadGameStore()]);
     useGameStore.getState().startNewGame(deck.commanderFaction, deck.id);
+    setTutorialMode(false);
+    navigateTo('game');
+  };
+
+  const handleStartTutorial = async () => {
+    const [, { useGameStore }] = await Promise.all([loadGameHUD(), loadGameStore()]);
+    useGameStore.getState().startNewGame('FURIA', 'FURIA_EMBESTIDA');
+    setTutorialMode(true);
     navigateTo('game');
   };
 
@@ -157,6 +186,7 @@ function App() {
 
   const handleOnlineGameFlow = () => {
     void Promise.all([loadGameHUD(), loadGameStore()]);
+    setTutorialMode(false);
     navigateTo('online-lobby');
   };
 
@@ -184,6 +214,9 @@ function App() {
             <button className="menu-btn primary" onClick={handleStartGameFlow}>
               ⚔️ Jugar contra la IA
             </button>
+            <button className="menu-btn tutorial" onClick={handleStartTutorial}>
+              <BookOpenCheck size={18} aria-hidden="true" /> Tutorial jugable
+            </button>
             <button className="menu-btn secondary" onClick={() => navigateTo('gallery')}>
               🎴 Colección de Cartas
             </button>
@@ -193,7 +226,7 @@ function App() {
           </div>
 
           <div className="menu-credits">
-            Antigravity Games Team • Google DeepMind
+            Ideado y creado por Bernardo Losada
           </div>
         </div>
       )}
@@ -242,7 +275,15 @@ function App() {
 
       <ViewErrorBoundary key={viewRecoveryVersion} onExit={handleViewRecovery}>
         <Suspense fallback={<div className="view-loading-indicator" aria-label="Cargando vista" />}>
-          {view === 'game' && <GameHUD onQuit={() => navigateTo('menu')} />}
+          {view === 'game' && (
+            <GameHUD
+              tutorialMode={tutorialMode}
+              onQuit={() => {
+                setTutorialMode(false);
+                navigateTo('menu');
+              }}
+            />
+          )}
           {view === 'online-lobby' && (
             <OnlineLobby
               initialRoomCode={new URLSearchParams(window.location.search).get('sala') ?? ''}
@@ -404,6 +445,21 @@ function App() {
           cursor: pointer;
           border: 1px solid transparent;
           transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .menu-btn.tutorial {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          color: #e8f8ff;
+          border-color: rgba(116, 210, 235, 0.34);
+          background: rgba(20, 58, 76, 0.64);
+        }
+        .menu-btn.tutorial:hover {
+          border-color: rgba(139, 226, 248, 0.72);
+          background: rgba(25, 78, 98, 0.78);
+          transform: translateY(-2px);
         }
 
         .menu-btn.primary {
