@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "balance": "node scripts/run-balance-report.mjs",
     "lint": "oxlint",
     "optimize:card-art": "node scripts/optimize-card-art.mjs",
     "test": "vitest run",

@@ -2,6 +2,22 @@
 
 Fecha: 2026-07-21
 
+## Ejecutar un informe nuevo
+
+```powershell
+npm run balance
+```
+
+El comando predeterminado reproduce 396 partidas: 12 mazos, 11 rivales y
+3 semillas por emparejamiento. Para ampliar la muestra:
+
+```powershell
+npm run balance -- --seeds 10 --rounds 80 --seed-prefix revision-julio
+```
+
+El informe usa el mismo motor y el mismo simulador automatizado que las pruebas.
+No mantiene reglas paralelas.
+
 ## Metodo
 
 - 12 mazos oficiales enfrentados entre si desde ambos lados del tablero.
