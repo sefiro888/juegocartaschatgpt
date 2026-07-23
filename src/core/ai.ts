@@ -5,8 +5,11 @@ import { BOARD_SIZE, COMMANDER_COLUMN, OPPONENT_BACK_ROW, PLAYER_BACK_ROW } from
 import { getReachablePositions, isBoardObstacle } from './boardPathfinding';
 import { cardHasKeyword } from './cardKeywords';
 import {
+  BOUNCE_SPELL_IDS,
   DIRECT_DAMAGE_SPELL_IDS,
   FREEZE_SPELL_IDS,
+  FRIENDLY_BUFF_SPELL_IDS,
+  GLOBAL_DAMAGE_SPELL_IDS,
   getDirectDamageSpellDefinition,
   getFreezeSpellDefinition,
 } from './spellEffectsCatalog';
@@ -42,8 +45,8 @@ const ENEMY_TARGET_SPELLS = new Set<string>([
 ]);
 
 // Buff spells that target a friendly unit
-const FRIENDLY_TARGET_SPELLS = new Set([
-  'impetu-fuego', 'furia-nexo',
+const FRIENDLY_TARGET_SPELLS = new Set<string>([
+  ...FRIENDLY_BUFF_SPELL_IDS,
 ]);
 
 // Spells that target a column (any position in the column)
@@ -54,13 +57,13 @@ const COLUMN_TARGET_SPELLS = new Set<string>(
 );
 
 // AoE spells that need no target
-const NO_TARGET_SPELLS = new Set([
-  'erupcion-volcanica',
+const NO_TARGET_SPELLS = new Set<string>([
+  ...GLOBAL_DAMAGE_SPELL_IDS,
 ]);
 
 // Vortice de Maná targets an enemy unit to bounce
-const BOUNCE_SPELLS = new Set([
-  'vortice-mana',
+const BOUNCE_SPELLS = new Set<string>([
+  ...BOUNCE_SPELL_IDS,
 ]);
 
 // Find the player commander entity on the board

@@ -21,8 +21,12 @@ import {
 import { getDeckDefinition } from './deckCatalog';
 import { cardHasKeyword } from './cardKeywords';
 import {
+  BOUNCE_SPELL_IDS,
   DIRECT_DAMAGE_SPELL_IDS,
   FREEZE_SPELL_IDS,
+  FRIENDLY_BUFF_SPELL_IDS,
+  GLOBAL_DAMAGE_SPELL_IDS,
+  getBounceSpellDefinition,
   getDirectDamageSpellDefinition,
   getFreezeSpellDefinition,
 } from './spellEffectsCatalog';
@@ -45,15 +49,15 @@ const SUPPORTED_ENEMY_SPELLS = new Set<string>([
   ...FREEZE_SPELL_IDS.filter(
     (cardId) => getFreezeSpellDefinition(cardId)?.targetMode === 'single-entity',
   ),
-  'vortice-mana',
+  ...BOUNCE_SPELL_IDS,
 ]);
-const SUPPORTED_FRIENDLY_SPELLS = new Set(['impetu-fuego', 'furia-nexo']);
+const SUPPORTED_FRIENDLY_SPELLS = new Set<string>(FRIENDLY_BUFF_SPELL_IDS);
 const SUPPORTED_COLUMN_SPELLS = new Set<string>(
   FREEZE_SPELL_IDS.filter(
     (cardId) => getFreezeSpellDefinition(cardId)?.targetMode === 'column',
   ),
 );
-const SUPPORTED_NO_TARGET_SPELLS = new Set(['erupcion-volcanica']);
+const SUPPORTED_NO_TARGET_SPELLS = new Set<string>(GLOBAL_DAMAGE_SPELL_IDS);
 
 function isSupportedSpell(card: Card): boolean {
   return SUPPORTED_ENEMY_SPELLS.has(card.id)
@@ -191,7 +195,7 @@ function selectEnemySpellTarget(
   card: Card,
 ): Position | undefined {
   const enemies = getEntities(state, getEnemyController(controller));
-  if (card.id === 'vortice-mana') {
+  if (getBounceSpellDefinition(card.id)) {
     return enemies
       .filter((entity) => !isCommander(entity))
       .sort((left, right) => right.attack - left.attack || right.health - left.health)[0]?.position;

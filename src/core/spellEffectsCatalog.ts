@@ -20,6 +20,27 @@ export interface FreezeSpellDefinition {
   drawCards?: number;
 }
 
+export interface FriendlyBuffSpellDefinition {
+  kind: 'friendly-buff';
+  attackBonus: number;
+  resetMovement: boolean;
+  resetAttack: boolean;
+}
+
+export interface BounceSpellDefinition {
+  kind: 'bounce';
+  excludesCommanders: boolean;
+  destination: 'owner-hand';
+  maximumHandSize: number;
+}
+
+export interface GlobalDamageSpellDefinition {
+  kind: 'global-damage';
+  damage: number;
+  excludesCommanders: boolean;
+  includesObstacles: boolean;
+}
+
 export const DIRECT_DAMAGE_SPELLS = {
   'lluvia-ceniza': {
     kind: 'direct-damage',
@@ -96,6 +117,52 @@ export const FREEZE_SPELLS = {
 export type FreezeSpellId = keyof typeof FREEZE_SPELLS;
 export const FREEZE_SPELL_IDS = Object.keys(FREEZE_SPELLS) as FreezeSpellId[];
 
+export const FRIENDLY_BUFF_SPELLS = {
+  'impetu-fuego': {
+    kind: 'friendly-buff',
+    attackBonus: 2,
+    resetMovement: true,
+    resetAttack: false,
+  },
+  'furia-nexo': {
+    kind: 'friendly-buff',
+    attackBonus: 3,
+    resetMovement: true,
+    resetAttack: true,
+  },
+} as const satisfies Record<string, FriendlyBuffSpellDefinition>;
+
+export type FriendlyBuffSpellId = keyof typeof FRIENDLY_BUFF_SPELLS;
+export const FRIENDLY_BUFF_SPELL_IDS = Object.keys(
+  FRIENDLY_BUFF_SPELLS,
+) as FriendlyBuffSpellId[];
+
+export const BOUNCE_SPELLS = {
+  'vortice-mana': {
+    kind: 'bounce',
+    excludesCommanders: true,
+    destination: 'owner-hand',
+    maximumHandSize: 10,
+  },
+} as const satisfies Record<string, BounceSpellDefinition>;
+
+export type BounceSpellId = keyof typeof BOUNCE_SPELLS;
+export const BOUNCE_SPELL_IDS = Object.keys(BOUNCE_SPELLS) as BounceSpellId[];
+
+export const GLOBAL_DAMAGE_SPELLS = {
+  'erupcion-volcanica': {
+    kind: 'global-damage',
+    damage: 2,
+    excludesCommanders: true,
+    includesObstacles: true,
+  },
+} as const satisfies Record<string, GlobalDamageSpellDefinition>;
+
+export type GlobalDamageSpellId = keyof typeof GLOBAL_DAMAGE_SPELLS;
+export const GLOBAL_DAMAGE_SPELL_IDS = Object.keys(
+  GLOBAL_DAMAGE_SPELLS,
+) as GlobalDamageSpellId[];
+
 export function getDirectDamageSpellDefinition(
   cardId: string,
 ): DirectDamageSpellDefinition | undefined {
@@ -107,5 +174,27 @@ export function getDirectDamageSpellDefinition(
 export function getFreezeSpellDefinition(cardId: string): FreezeSpellDefinition | undefined {
   return cardId in FREEZE_SPELLS
     ? FREEZE_SPELLS[cardId as FreezeSpellId]
+    : undefined;
+}
+
+export function getFriendlyBuffSpellDefinition(
+  cardId: string,
+): FriendlyBuffSpellDefinition | undefined {
+  return cardId in FRIENDLY_BUFF_SPELLS
+    ? FRIENDLY_BUFF_SPELLS[cardId as FriendlyBuffSpellId]
+    : undefined;
+}
+
+export function getBounceSpellDefinition(cardId: string): BounceSpellDefinition | undefined {
+  return cardId in BOUNCE_SPELLS
+    ? BOUNCE_SPELLS[cardId as BounceSpellId]
+    : undefined;
+}
+
+export function getGlobalDamageSpellDefinition(
+  cardId: string,
+): GlobalDamageSpellDefinition | undefined {
+  return cardId in GLOBAL_DAMAGE_SPELLS
+    ? GLOBAL_DAMAGE_SPELLS[cardId as GlobalDamageSpellId]
     : undefined;
 }

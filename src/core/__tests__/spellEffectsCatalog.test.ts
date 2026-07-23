@@ -4,10 +4,16 @@ import { CARDS_DB, getCommanderForFaction, getPreconstructedDeck } from '../card
 import { canSpellTargetObstacle, initializeGame, playSpell } from '../engine';
 import { MANA_TYPES } from '../factionRules';
 import {
+  BOUNCE_SPELLS,
   DIRECT_DAMAGE_SPELLS,
   FREEZE_SPELLS,
+  FRIENDLY_BUFF_SPELLS,
+  GLOBAL_DAMAGE_SPELLS,
+  getBounceSpellDefinition,
   getDirectDamageSpellDefinition,
   getFreezeSpellDefinition,
+  getFriendlyBuffSpellDefinition,
+  getGlobalDamageSpellDefinition,
 } from '../spellEffectsCatalog';
 
 function createSpellState(): GameState {
@@ -144,5 +150,75 @@ describe('structured spell effects', () => {
     expect(result.board['4,5'].frozenTurns).toBe(0);
     expect(result.board['4,3'].frozenTurns).toBe(0);
     expect(result.board['3,4'].frozenTurns).toBe(0);
+  });
+
+  it('links friendly buffs to real spells and preserves their action resets', () => {
+    for (const [cardId, definition] of Object.entries(FRIENDLY_BUFF_SPELLS)) {
+      expect(CARDS_DB[cardId]?.type, `Invalid friendly buff ${cardId}`).toBe('HECHIZO');
+      expect(getFriendlyBuffSpellDefinition(cardId)).toEqual(definition);
+    }
+
+    const impetusState = createSpellState();
+    impetusState.player.hand = [{ ...CARDS_DB['impetu-fuego'] }];
+    impetusState.board['4,4'] = createEntity('sabueso-brasa', 'impetus-target', 'PLAYER', 4, 4);
+    impetusState.board['4,4'].hasMovedThisTurn = true;
+    impetusState.board['4,4'].hasAttackedThisTurn = true;
+
+    const impetusResult = playSpell(impetusState, 'PLAYER', 'impetu-fuego', { x: 4, y: 4 });
+
+    expect(impetusResult.board['4,4']).toMatchObject({
+      attack: 4,
+      hasMovedThisTurn: false,
+      hasAttackedThisTurn: true,
+    });
+
+    const furyState = createSpellState();
+    furyState.player.hand = [{ ...CARDS_DB['furia-nexo'] }];
+    furyState.board['4,4'] = createEntity('sabueso-brasa', 'fury-target', 'PLAYER', 4, 4);
+    furyState.board['4,4'].hasMovedThisTurn = true;
+    furyState.board['4,4'].hasAttackedThisTurn = true;
+
+    const furyResult = playSpell(furyState, 'PLAYER', 'furia-nexo', { x: 4, y: 4 });
+
+    expect(furyResult.board['4,4']).toMatchObject({
+      attack: 5,
+      hasMovedThisTurn: false,
+      hasAttackedThisTurn: false,
+    });
+  });
+
+  it('returns a non-commander entity to its owner hand through the bounce catalog', () => {
+    expect(getBounceSpellDefinition('vortice-mana')).toEqual(BOUNCE_SPELLS['vortice-mana']);
+
+    const state = createSpellState();
+    state.player.hand = [{ ...CARDS_DB['vortice-mana'] }];
+    state.board['4,4'] = createEntity('sabueso-brasa', 'bounce-target', 'OPPONENT', 4, 4);
+    const opponentHandSize = state.opponent.hand.length;
+
+    const result = playSpell(state, 'PLAYER', 'vortice-mana', { x: 4, y: 4 });
+
+    expect(result.board['4,4']).toBeUndefined();
+    expect(result.opponent.hand).toHaveLength(opponentHandSize + 1);
+    expect(result.opponent.hand.at(-1)?.id).toBe('sabueso-brasa');
+  });
+
+  it('applies cataloged global damage without harming commanders', () => {
+    expect(getGlobalDamageSpellDefinition('erupcion-volcanica')).toEqual(
+      GLOBAL_DAMAGE_SPELLS['erupcion-volcanica'],
+    );
+
+    const state = createSpellState();
+    state.player.hand = [{ ...CARDS_DB['erupcion-volcanica'] }];
+    state.board['3,3'] = createEntity('sabueso-brasa', 'eruption-unit', 'OPPONENT', 3, 3);
+    state.board['4,4'] = createEntity('obstaculo-risco', 'eruption-obstacle', 'OPPONENT', 4, 4);
+    state.board['4,4'].health = 3;
+    state.board['4,4'].maxHealth = 3;
+
+    const result = playSpell(state, 'PLAYER', 'erupcion-volcanica');
+
+    expect(result.board['3,3']).toBeUndefined();
+    expect(result.board['4,4'].health).toBe(1);
+    expect(result.board['5,0'].health).toBe(25);
+    expect(result.board['5,9'].health).toBe(25);
   });
 });

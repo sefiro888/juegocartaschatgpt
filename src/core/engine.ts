@@ -5,8 +5,11 @@ import { findMovementPath, hasLineOfSight, isBoardObstacle } from './boardPathfi
 import { getObstacleDefinition } from './obstacleConfig';
 import { cardHasKeyword } from './cardKeywords';
 import {
+  getBounceSpellDefinition,
   getDirectDamageSpellDefinition,
   getFreezeSpellDefinition,
+  getFriendlyBuffSpellDefinition,
+  getGlobalDamageSpellDefinition,
 } from './spellEffectsCatalog';
 import {
   MANA_TYPES,
@@ -1094,51 +1097,42 @@ export function playSpell(
     if (canResolveEffect) drawCardsForCaster(freezeEffect.drawCards ?? 0);
   }
 
-  if (card.id === 'vortice-mana' && targetPos) {
+  const bounceEffect = getBounceSpellDefinition(card.id);
+  if (bounceEffect && targetPos) {
     const key = `${targetPos.x},${targetPos.y}`;
     const targetEnt = nextBoard[key];
-    if (targetEnt && targetEnt.id !== 'commander-player' && targetEnt.id !== 'commander-opponent') {
+    const isCommander = targetEnt?.id === 'commander-player' || targetEnt?.id === 'commander-opponent';
+    if (targetEnt && (!bounceEffect.excludesCommanders || !isCommander)) {
       delete nextBoard[key];
       const targetOwnerState = targetEnt.controller === 'PLAYER' ? pState1 : pState2;
       const baseCard = CARDS_DB[targetEnt.cardId];
-      if (baseCard && targetOwnerState.hand.length < 10) {
+      if (baseCard && targetOwnerState.hand.length < bounceEffect.maximumHandSize) {
         targetOwnerState.hand = [...targetOwnerState.hand, baseCard];
       }
     }
   }
 
-  if (card.id === 'impetu-fuego' && targetPos) {
+  const friendlyBuffEffect = getFriendlyBuffSpellDefinition(card.id);
+  if (friendlyBuffEffect && targetPos) {
     const key = `${targetPos.x},${targetPos.y}`;
     const targetEnt = nextBoard[key];
     if (targetEnt && targetEnt.controller === playerId) {
-      targetEnt.attack += 2;
-      // Allow moving again
-      targetEnt.hasMovedThisTurn = false;
+      targetEnt.attack += friendlyBuffEffect.attackBonus;
+      if (friendlyBuffEffect.resetMovement) targetEnt.hasMovedThisTurn = false;
+      if (friendlyBuffEffect.resetAttack) targetEnt.hasAttackedThisTurn = false;
     }
   }
 
-  // --- NEW SPELL EFFECTS ---
-
-  // Furia del Nexo: +3/+0 and remove summon sickness (Carga) to a target friendly unit
-  if (card.id === 'furia-nexo' && targetPos) {
-    const key = `${targetPos.x},${targetPos.y}`;
-    const targetEnt = nextBoard[key];
-    if (targetEnt && targetEnt.controller === playerId) {
-      targetEnt.attack += 3;
-      targetEnt.hasMovedThisTurn = false;
-      targetEnt.hasAttackedThisTurn = false;
-    }
-  }
-
-  // Erupción Volcánica: Deal 2 damage to ALL units on the board (not commanders, but actually all units per card text)
-  if (card.id === 'erupcion-volcanica') {
-    // Work from a snapshot: a previous target may remove another entity via a death trigger.
+  const globalDamageEffect = getGlobalDamageSpellDefinition(card.id);
+  if (globalDamageEffect) {
     const entityKeys = Object.keys(nextBoard);
     for (const key of entityKeys) {
       if (!nextBoard[key]) continue;
       const ent = nextBoard[key];
-      if (ent.id === 'commander-player' || ent.id === 'commander-opponent') continue;
-      dealDamageAtKey(key, 2);
+      const isCommander = ent.id === 'commander-player' || ent.id === 'commander-opponent';
+      if (globalDamageEffect.excludesCommanders && isCommander) continue;
+      if (!globalDamageEffect.includesObstacles && isBoardObstacle(ent)) continue;
+      dealDamageAtKey(key, globalDamageEffect.damage);
     }
   }
 
