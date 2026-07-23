@@ -2,6 +2,7 @@ import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { CardDOM } from './CardDOM';
 import { CardKeywordBadges } from './CardKeywordBadges';
+import { getHandCardPrimaryAction } from './handCardInteraction';
 import { CARDS_DB } from '../core/cardsDb';
 import type { BoardEntity, Card, GameState } from '../types/card';
 import {
@@ -976,6 +977,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit, tutorialMode = false }
               const isSelected = selectedCardInHand?.id === card.id;
               const availability = getHandCardAvailability(card);
               const isPlayable = availability.state === 'ready';
+              const primaryAction = getHandCardPrimaryAction(card, isPlayable);
 
               return (
                 <button
@@ -987,8 +989,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit, tutorialMode = false }
                     '--hand-offset': `${Math.abs(idx - (player.hand.length - 1) / 2) * 2}px`,
                   } as React.CSSProperties}
                   onClick={() => {
-                    const usesTouchLayout = window.matchMedia('(max-width: 1100px), (pointer: coarse)').matches;
-                    if (usesTouchLayout && card.type === 'MANA' && isPlayable) {
+                    if (primaryAction === 'play-mana') {
                       handlePlayMana(card.id);
                       setMobileInspectorOpen(false);
                       return;
@@ -997,7 +998,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit, tutorialMode = false }
                     setMobileInspectorOpen(false);
                   }}
                   onDoubleClick={() => setInspectedCard(card)}
-                  aria-label={`${isSelected ? 'Deseleccionar' : 'Seleccionar'} ${card.name}`}
+                  aria-label={primaryAction === 'play-mana'
+                    ? `Jugar ${card.name}`
+                    : `${isSelected ? 'Deseleccionar' : 'Seleccionar'} ${card.name}`}
                   title={`${availability.detail} Doble clic para ver la carta completa.`}
                 >
                   <CardDOM
