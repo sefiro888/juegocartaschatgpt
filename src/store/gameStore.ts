@@ -17,6 +17,8 @@ import {
   loadStoredOnlineSession,
   saveStoredOnlineSession,
 } from '../online/sessionStorage';
+import { readLocalStorage, writeLocalStorage } from '../utils/safeStorage';
+import { getFreezeSpellDefinition } from '../core/spellEffectsCatalog';
 
 type MatchService = typeof import('../online/matchService');
 type SupabaseService = typeof import('../online/supabaseClient');
@@ -47,8 +49,8 @@ const loadSupabaseService = () => {
   return supabaseServicePromise;
 };
 
-const initialSoundEnabled = typeof window !== 'undefined'
-  && window.localStorage.getItem('nexo-sound-enabled') === 'true';
+const SOUND_STORAGE_KEY = 'nexo-sound-enabled';
+const initialSoundEnabled = readLocalStorage(SOUND_STORAGE_KEY) === 'true';
 audioService.toggleSound(initialSoundEnabled);
 
 function createGameEvent(text: string, tone: GameEvent['tone']): GameEvent {
@@ -188,7 +190,7 @@ function playAIActionSound(step: AIActionStep) {
   else if (step.kind === 'move') audioService.playMove();
   else if (step.kind === 'spell') {
     const cardId = step.cardId ?? '';
-    if (cardId.includes('congelacion') || cardId.includes('prision') || cardId.includes('tormenta') || cardId.includes('escarcha')) {
+    if (getFreezeSpellDefinition(cardId)) {
       audioService.playFreeze();
     } else {
       audioService.playClash();
@@ -447,7 +449,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   toggleSound: () => {
     const enabled = !get().soundEnabled;
-    window.localStorage.setItem('nexo-sound-enabled', String(enabled));
+    writeLocalStorage(SOUND_STORAGE_KEY, String(enabled));
     audioService.toggleSound(enabled);
     if (enabled) audioService.playTurnChange();
     set({ soundEnabled: enabled });
@@ -543,7 +545,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (nextState === gameState) return;
     const terrainDestroyed = Boolean(target && isBoardObstacle(target) && !nextState.board[targetKey]);
     if (terrainDestroyed) audioService.playTerrainBreak();
-    else if (cardId.includes('congelacion') || cardId.includes('prision') || cardId.includes('tormenta') || cardId.includes('escarcha')) {
+    else if (getFreezeSpellDefinition(cardId)) {
       audioService.playFreeze();
     } else {
       audioService.playClash();

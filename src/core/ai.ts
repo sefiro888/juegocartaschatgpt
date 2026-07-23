@@ -3,6 +3,13 @@ import { canAfford, canAffordCard, canAttackTarget, playManaCard, summonUnit, mo
 import { CARDS_DB } from './cardsDb';
 import { BOARD_SIZE, COMMANDER_COLUMN, OPPONENT_BACK_ROW, PLAYER_BACK_ROW } from './boardConfig';
 import { getReachablePositions, isBoardObstacle } from './boardPathfinding';
+import { cardHasKeyword } from './cardKeywords';
+import {
+  DIRECT_DAMAGE_SPELL_IDS,
+  FREEZE_SPELL_IDS,
+  getDirectDamageSpellDefinition,
+  getFreezeSpellDefinition,
+} from './spellEffectsCatalog';
 
 export type AIActionKind = 'mana' | 'summon' | 'spell' | 'attack' | 'move';
 
@@ -27,10 +34,11 @@ function reportAIAction(
 }
 
 // Spell IDs that target a single enemy
-const ENEMY_TARGET_SPELLS = new Set([
-  'lluvia-ceniza', 'chispa-fugaz', 'prision-glacial',
-  'cometa-arcano', 'destello-runico', 'congelacion-rapida',
-  'espora-venenosa', 'juicio-divino', 'pesadilla-mortal',
+const ENEMY_TARGET_SPELLS = new Set<string>([
+  ...DIRECT_DAMAGE_SPELL_IDS,
+  ...FREEZE_SPELL_IDS.filter(
+    (cardId) => getFreezeSpellDefinition(cardId)?.targetMode === 'single-entity',
+  ),
 ]);
 
 // Buff spells that target a friendly unit
@@ -39,9 +47,11 @@ const FRIENDLY_TARGET_SPELLS = new Set([
 ]);
 
 // Spells that target a column (any position in the column)
-const COLUMN_TARGET_SPELLS = new Set([
-  'tormenta-mana',
-]);
+const COLUMN_TARGET_SPELLS = new Set<string>(
+  FREEZE_SPELL_IDS.filter(
+    (cardId) => getFreezeSpellDefinition(cardId)?.targetMode === 'column',
+  ),
+);
 
 // AoE spells that need no target
 const NO_TARGET_SPELLS = new Set([
@@ -300,12 +310,7 @@ export function executeAITurn(state: GameState, observer?: AIActionObserver): Ga
           const commander = playerEntities.find(ent => ent.id === 'commander-player');
 
           // For damage spells, calculate expected damage
-          let spellDamage = 0;
-          if (card.id === 'lluvia-ceniza') spellDamage = 3;
-          if (card.id === 'chispa-fugaz') spellDamage = 2;
-          if (card.id === 'cometa-arcano') spellDamage = 4;
-          if (card.id === 'espora-venenosa') spellDamage = 2;
-          if (card.id === 'juicio-divino' || card.id === 'pesadilla-mortal') spellDamage = 3;
+          const spellDamage = getDirectDamageSpellDefinition(card.id)?.damage ?? 0;
 
           let target: BoardEntity | undefined;
 
@@ -334,8 +339,8 @@ export function executeAITurn(state: GameState, observer?: AIActionObserver): Ga
           }
 
           if (target) {
-            // Special check for destello-runico: target must be adjacent to opponent's commander
-            if (card.id === 'destello-runico') {
+            // Some freeze spells require a target adjacent to the caster's commander.
+            if (getFreezeSpellDefinition(card.id)?.requiresAdjacentCommander) {
               const oppCmd = findCommander(currentState, 'OPPONENT');
               if (!oppCmd || !isAdjacent(oppCmd.position, target.position, false)) {
                 continue; // Skip this spell
@@ -344,7 +349,7 @@ export function executeAITurn(state: GameState, observer?: AIActionObserver): Ga
 
             // Check spell immunity
             const targetCard = CARDS_DB[target.cardId];
-            if (targetCard && targetCard.rulesText.includes('Inmune a Hechizos')) {
+            if (cardHasKeyword(targetCard, 'spell-immunity')) {
               continue;
             }
 
@@ -432,7 +437,7 @@ export function executeAITurn(state: GameState, observer?: AIActionObserver): Ga
         getMovementAllowance(currentState, unit),
         {
           allowDiagonal: true,
-          canFly: cardRef.rulesText.includes('Vuelo'),
+          canFly: cardHasKeyword(cardRef, 'flying'),
         },
       ).map((candidate) => candidate.position);
 

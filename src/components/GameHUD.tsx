@@ -51,6 +51,10 @@ class BoardErrorBoundary extends React.Component<
     return { hasError: true };
   }
 
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('BoardErrorBoundary captured a 3D scene error', error, errorInfo);
+  }
+
   render() {
     if (this.state.hasError) {
       return (
@@ -93,6 +97,30 @@ const TerrainInspector: React.FC<{ entity: BoardEntity }> = ({ entity }) => {
         <span>Los ataques y hechizos de dano pueden derribarlo.</span>
       </div>
       <p className="terrain-description">{obstacle.description}</p>
+    </div>
+  );
+};
+
+const EntityCombatStats: React.FC<{ entity: BoardEntity }> = ({ entity }) => {
+  const isDamaged = entity.health < entity.maxHealth;
+
+  return (
+    <div className="stats-grid" aria-label="Estadisticas de combate">
+      <div className="stat-box attack">
+        <div className="stat-circle attack-circle">
+          <Swords aria-hidden="true" />
+          <span className="stat-circle-val">{entity.attack}</span>
+        </div>
+        <span className="stat-label">Ataque</span>
+      </div>
+      <div className={`stat-box health ${isDamaged ? 'damaged' : ''}`}>
+        <div className="stat-circle health-circle">
+          <Shield aria-hidden="true" />
+          <span className="stat-circle-val">{entity.health}</span>
+          <span className="stat-circle-max">/{entity.maxHealth}</span>
+        </div>
+        <span className="stat-label">Vida</span>
+      </div>
     </div>
   );
 };
@@ -154,21 +182,6 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit, tutorialMode = false }
     onlineError,
     isOnlineLoading,
   } = useGameStore();
-
-  const isEntityVisibleInHUD = (entity: BoardEntity) => {
-    if (!gameState) return true;
-    if (entity.controller === localController) return true;
-    if (entity.cardId.startsWith('obstaculo-')) return true;
-
-    const playerEntities = Object.values(gameState.board).filter((candidate) => candidate.controller === localController);
-    if (entity.position.y <= 2) return true;
-
-    return playerEntities.some((playerEntity) => {
-      const dx = Math.abs(playerEntity.position.x - entity.position.x);
-      const dy = Math.abs(playerEntity.position.y - entity.position.y);
-      return (dx + dy) <= 2;
-    });
-  };
 
   const turn = gameState?.turn || 0;
   const activePlayer = gameState?.activePlayer || 'PLAYER';
@@ -709,36 +722,12 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit, tutorialMode = false }
             {hoveredEntity ? (
               isBoardObstacle(hoveredEntity) ? (
                 <TerrainInspector entity={hoveredEntity} />
-              ) : !isEntityVisibleInHUD(hoveredEntity) ? (
-                <div className="inspector-card-hidden">
-                  <div className="inspected-card-preview-hidden">
-                    <div className="hidden-card-placeholder">
-                      <span className="eye-icon">👁️</span>
-                      <span className="question">?</span>
-                    </div>
-                  </div>
-                  <h3 style={{ fontSize: '1rem', marginTop: '10px', color: '#818cf8' }}>Criatura Oculta</h3>
-                  <p className="rules-desc" style={{ fontStyle: 'italic', opacity: 0.6 }}>Esta unidad enemiga está oculta por la niebla de guerra. Acércate para revelarla.</p>
-                </div>
               ) : (
                 <div className="sidebar-entity-info animated-fade">
                   <div className="inspected-card-preview">
                     <CardDOM card={CARDS_DB[hoveredEntity.cardId]} mode="hand" />
                   </div>
-                  <div className="stats-grid">
-                    <div className="stat-box attack">
-                      <div className="stat-circle attack-circle">
-                        <span className="stat-circle-val">{hoveredEntity.attack}</span>
-                      </div>
-                      <span className="stat-label">ATK</span>
-                    </div>
-                    <div className="stat-box health">
-                      <div className="stat-circle health-circle">
-                        <span className="stat-circle-val">{hoveredEntity.health}</span>
-                      </div>
-                      <span className="stat-label">HP {hoveredEntity.health}/{hoveredEntity.maxHealth}</span>
-                    </div>
-                  </div>
+                  <EntityCombatStats entity={hoveredEntity} />
                   <div className="card-specs-mini">
                     {CARDS_DB[hoveredEntity.cardId]?.range !== undefined && (
                       <span className="spec-pill">🎯 Rango: {CARDS_DB[hoveredEntity.cardId].range}</span>
@@ -750,7 +739,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit, tutorialMode = false }
                   </div>
                   <div className="rules-box">
                     <p className="rules-title">Reglas Especiales</p>
-                    <CardKeywordBadges rulesText={CARDS_DB[hoveredEntity.cardId]?.rulesText ?? ''} />
+                    <CardKeywordBadges card={CARDS_DB[hoveredEntity.cardId]} />
                     <p className="rules-desc">{CARDS_DB[hoveredEntity.cardId]?.rulesText}</p>
                   </div>
                   <div className="lore-box-sidebar">
@@ -767,36 +756,12 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit, tutorialMode = false }
             ) : selectedEntity ? (
               isBoardObstacle(selectedEntity) ? (
                 <TerrainInspector entity={selectedEntity} />
-              ) : !isEntityVisibleInHUD(selectedEntity) ? (
-                <div className="inspector-card-hidden">
-                  <div className="inspected-card-preview-hidden">
-                    <div className="hidden-card-placeholder">
-                      <span className="eye-icon">👁️</span>
-                      <span className="question">?</span>
-                    </div>
-                  </div>
-                  <h3 style={{ fontSize: '1rem', marginTop: '10px', color: '#818cf8' }}>Criatura Oculta</h3>
-                  <p className="rules-desc" style={{ fontStyle: 'italic', opacity: 0.6 }}>Esta unidad enemiga está oculta por la niebla de guerra. Acércate para revelarla.</p>
-                </div>
               ) : (
                 <div className="sidebar-entity-info animated-fade">
                   <div className="inspected-card-preview">
                     <CardDOM card={CARDS_DB[selectedEntity.cardId]} mode="hand" />
                   </div>
-                  <div className="stats-grid">
-                    <div className="stat-box attack">
-                      <div className="stat-circle attack-circle">
-                        <span className="stat-circle-val">{selectedEntity.attack}</span>
-                      </div>
-                      <span className="stat-label">ATK</span>
-                    </div>
-                    <div className="stat-box health">
-                      <div className="stat-circle health-circle">
-                        <span className="stat-circle-val">{selectedEntity.health}</span>
-                      </div>
-                      <span className="stat-label">HP {selectedEntity.health}/{selectedEntity.maxHealth}</span>
-                    </div>
-                  </div>
+                  <EntityCombatStats entity={selectedEntity} />
                   <div className="card-specs-mini">
                     {CARDS_DB[selectedEntity.cardId]?.range !== undefined && (
                       <span className="spec-pill">🎯 Rango: {CARDS_DB[selectedEntity.cardId].range}</span>
@@ -808,7 +773,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit, tutorialMode = false }
                   </div>
                   <div className="rules-box">
                     <p className="rules-title">Reglas Especiales</p>
-                    <CardKeywordBadges rulesText={CARDS_DB[selectedEntity.cardId]?.rulesText ?? ''} />
+                    <CardKeywordBadges card={CARDS_DB[selectedEntity.cardId]} />
                     <p className="rules-desc">{CARDS_DB[selectedEntity.cardId]?.rulesText}</p>
                   </div>
                   <div className="lore-box-sidebar">
@@ -872,7 +837,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit, tutorialMode = false }
                     <span className="spec-pill">❤️ HP: {selectedCardInHand.maxHealth}</span>
                   )}
                 </div>
-                <CardKeywordBadges rulesText={selectedCardInHand.rulesText} />
+                <CardKeywordBadges card={selectedCardInHand} />
                 <p className="rules-desc-sidebar">{selectedCardInHand.rulesText}</p>
                 <div className="lore-box-sidebar hand-lore">
                   <p className="lore-desc">"{selectedCardInHand.flavorText}"</p>
@@ -1145,7 +1110,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit, tutorialMode = false }
 
               <section className="card-inspection-section">
                 <h3>Reglas</h3>
-                <CardKeywordBadges rulesText={inspectedCard.rulesText} />
+                <CardKeywordBadges card={inspectedCard} />
                 <p>{inspectedCard.rulesText}</p>
               </section>
 
@@ -1646,43 +1611,6 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit, tutorialMode = false }
           min-height: 74px;
         }
 
-        .inspector-card-hidden {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-          gap: 12px;
-          margin-top: 15px;
-          animation: slide-up 0.3s ease-out;
-        }
-        .inspected-card-preview-hidden {
-          width: 140px;
-          height: 190px;
-          border: 2px dashed rgba(255, 255, 255, 0.15);
-          border-radius: 9px;
-          background: radial-gradient(circle at center, #111827 0%, #030712 100%);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          position: relative;
-        }
-        .hidden-card-placeholder {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 6px;
-        }
-        .hidden-card-placeholder .eye-icon {
-          font-size: 2.2rem;
-          opacity: 0.15;
-        }
-        .hidden-card-placeholder .question {
-          font-size: 3rem;
-          font-weight: bold;
-          color: #818cf8;
-          text-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
-        }
-
         .sidebar-title {
           font-size: 0.95rem;
           color: #fff;
@@ -1822,49 +1750,90 @@ export const GameHUD: React.FC<GameHUDProps> = ({ onQuit, tutorialMode = false }
           height: 200px;
         }
 
-        /* Circular stat badges */
+        /* Combat plates shared with the card language. */
         .stats-grid {
           display: flex;
           justify-content: center;
-          gap: 20px;
+          gap: 10px;
         }
         .stat-box {
           display: flex;
           flex-direction: column;
           align-items: center;
           gap: 4px;
+          min-width: 78px;
         }
         .stat-circle {
-          width: 46px;
-          height: 46px;
-          border-radius: 50%;
-          display: flex;
+          width: 78px;
+          height: 42px;
+          display: grid;
+          grid-template-columns: 24px auto auto;
           align-items: center;
           justify-content: center;
-          font-weight: 800;
-          font-size: 1.2rem;
-          border: 2px solid;
+          gap: 3px;
+          padding: 4px 8px;
+          overflow: hidden;
+          border: 1.5px solid;
           position: relative;
+          box-sizing: border-box;
+          box-shadow: 0 6px 12px rgba(0,0,0,0.42), inset 0 1px rgba(255,255,255,0.16);
+        }
+        .stat-circle::after {
+          content: '';
+          position: absolute;
+          top: -20px;
+          left: 2px;
+          width: 48px;
+          height: 32px;
+          border: 1px solid rgba(255,255,255,0.1);
+          transform: rotate(25deg);
+        }
+        .stat-circle svg {
+          z-index: 1;
+          width: 17px;
+          height: 17px;
+          padding-right: 6px;
+          border-right: 1px solid rgba(255,255,255,0.16);
         }
         .stat-circle-val {
+          z-index: 1;
           font-family: var(--font-display);
+          font-size: 1.15rem;
+          font-weight: 900;
+          line-height: 1;
+        }
+        .stat-circle-max {
+          z-index: 1;
+          align-self: end;
+          padding-bottom: 5px;
+          color: rgba(255,255,255,0.68);
+          font-size: 0.58rem;
+          font-weight: 800;
         }
         .attack-circle {
-          background: rgba(239, 68, 68, 0.12);
-          border-color: #f87171;
-          color: #f87171;
-          box-shadow: 0 0 10px rgba(248, 113, 113, 0.2);
+          border-radius: 7px 14px 7px 14px;
+          background: linear-gradient(145deg, #a22a2a, #591414 54%, #230707);
+          border-color: #ff7659;
+          color: #fff1eb;
+          box-shadow: 0 0 11px rgba(255, 88, 62, 0.32), 0 6px 12px rgba(0,0,0,0.42);
         }
         .health-circle {
-          background: rgba(52, 211, 153, 0.12);
-          border-color: #34d399;
-          color: #34d399;
-          box-shadow: 0 0 10px rgba(52, 211, 153, 0.2);
+          border-radius: 13px 13px 8px 8px;
+          background: linear-gradient(145deg, #167d5a, #074936 54%, #021f18);
+          border-color: #4ce1ad;
+          color: #ebfff7;
+          box-shadow: 0 0 11px rgba(52, 211, 153, 0.3), 0 6px 12px rgba(0,0,0,0.42);
+        }
+        .stat-box.health.damaged .health-circle {
+          border-color: #ffb14f;
+          color: #fff1d6;
+          background: linear-gradient(145deg, #8a4b16, #51300f 54%, #251305);
+          box-shadow: 0 0 12px rgba(255,154,55,0.38), 0 6px 12px rgba(0,0,0,0.42);
         }
         .stat-label {
           font-size: 0.6rem;
-          color: var(--color-text-muted);
-          font-weight: 700;
+          color: #a9bac5;
+          font-weight: 800;
           text-transform: uppercase;
           letter-spacing: 0.05em;
         }

@@ -3,6 +3,11 @@ import { CARDS_DB } from './cardsDb';
 import { COMMANDER_COLUMN, OPPONENT_BACK_ROW, PLAYER_BACK_ROW, isInsideBoard } from './boardConfig';
 import { findMovementPath, hasLineOfSight, isBoardObstacle } from './boardPathfinding';
 import { getObstacleDefinition } from './obstacleConfig';
+import { cardHasKeyword } from './cardKeywords';
+import {
+  getDirectDamageSpellDefinition,
+  getFreezeSpellDefinition,
+} from './spellEffectsCatalog';
 import {
   MANA_TYPES,
   cloneManaSources,
@@ -90,7 +95,7 @@ function isInCardAttackGeometry(
     return isAdjacent(
       attackerPosition,
       targetPosition,
-      card.rulesText.includes('Movimiento Diagonal'),
+      cardHasKeyword(card, 'diagonal'),
     );
   }
   return getDistance(attackerPosition, targetPosition) <= range &&
@@ -133,7 +138,7 @@ export function canAttackTarget(
 }
 
 export function canSpellTargetObstacle(cardId: string): boolean {
-  return cardId === 'lluvia-ceniza' || cardId === 'chispa-fugaz' || cardId === 'cometa-arcano';
+  return getDirectDamageSpellDefinition(cardId)?.canTargetObstacles ?? false;
 }
 
 export function getMovementAllowance(state: GameState, entity: BoardEntity): number {
@@ -179,7 +184,7 @@ export function getCombatPreview(
     damageToTarget = Math.max(0, damageToTarget - 1);
     notes.push('El risco cercano concede cobertura: -1 de dano recibido.');
   }
-  if (targetCard?.rulesText.includes('Resistencia')) {
+  if (cardHasKeyword(targetCard, 'resistance')) {
     damageToTarget = Math.max(0, damageToTarget - 1);
     notes.push('El objetivo reduce 1 de daño.');
   }
@@ -191,7 +196,7 @@ export function getCombatPreview(
   const targetCanRetaliate = !isBoardObstacle(target) && targetCard?.type !== 'ESTRUCTURA' &&
     isInCardAttackGeometry(state.board, target.position, attacker.position, targetCard);
   let damageToAttacker = targetCanRetaliate ? getEffectiveAttack(state.board, target) : 0;
-  if (attackerCard.rulesText.includes('Resistencia')) {
+  if (cardHasKeyword(attackerCard, 'resistance')) {
     damageToAttacker = Math.max(0, damageToAttacker - 1);
     notes.push('Tu unidad reduce 1 de daño.');
   }
@@ -634,7 +639,7 @@ export function summonUnit(
   };
 
   // Special Summon Keywords: "Carga" (Sabueso de Brasa, Draco de Magma, Trasgo Piroclástico can move and attack immediately)
-  if (card.rulesText.includes('Carga')) {
+  if (cardHasKeyword(card, 'charge')) {
     newEntity.hasMovedThisTurn = false;
     newEntity.hasAttackedThisTurn = false;
   }
@@ -810,7 +815,7 @@ export function moveUnit(state: GameState, from: Position, to: Position): GameSt
   const movementAllowance = getMovementAllowance(state, entity);
   const path = findMovementPath(state.board, from, to, movementAllowance, {
     allowDiagonal: true,
-    canFly: card.rulesText.includes('Vuelo'),
+    canFly: cardHasKeyword(card, 'flying'),
   });
   if (!path) return state;
 
@@ -863,7 +868,7 @@ export function combatAttack(state: GameState, attackerPos: Position, targetPos:
   if (!isBoardObstacle(target) && hasRidgeCover(newBoard, attacker.position, target.position)) {
     damageToTarget = Math.max(0, damageToTarget - 1);
   }
-  if (tarCard && tarCard.rulesText.includes('Resistencia')) {
+  if (cardHasKeyword(tarCard, 'resistance')) {
     damageToTarget = Math.max(0, damageToTarget - 1);
   }
 
@@ -873,7 +878,7 @@ export function combatAttack(state: GameState, attackerPos: Position, targetPos:
     isInCardAttackGeometry(newBoard, target.position, attacker.position, tarCard),
   );
   let damageToAttacker = targetCanRetaliate ? getEffectiveAttack(newBoard, target) : 0;
-  if (attCard && attCard.rulesText.includes('Resistencia')) {
+  if (cardHasKeyword(attCard, 'resistance')) {
     damageToAttacker = Math.max(0, damageToAttacker - 1);
   }
 
@@ -983,7 +988,7 @@ export function playSpell(
     const targetKey = `${targetPos.x},${targetPos.y}`;
     const targetEnt = state.board[targetKey];
     if (isBoardObstacle(targetEnt) && !canSpellTargetObstacle(cardId)) return state;
-    if (targetEnt && CARDS_DB[targetEnt.cardId]?.rulesText.includes('Inmune a Hechizos')) {
+    if (targetEnt && cardHasKeyword(CARDS_DB[targetEnt.cardId], 'spell-immunity')) {
       return state; // Cast is blocked / invalid
     }
   }
@@ -1021,67 +1026,72 @@ export function playSpell(
     }
   };
 
-  // Resolve Spell Effects
-  if (card.id === 'lluvia-ceniza' && targetPos) {
-    const key = `${targetPos.x},${targetPos.y}`;
-    dealDamageAtKey(key, 3);
-  }
-
-  if (card.id === 'chispa-fugaz' && targetPos) {
-    const key = `${targetPos.x},${targetPos.y}`;
-    dealDamageAtKey(key, 2);
-    // Discard random card
-    const casterState = playerId === 'PLAYER' ? pState1 : pState2;
-    if (casterState.hand.length > 0) {
-      const random = createActionRandom(state, playerId, `${card.id}:discard`);
-      const discardIdx = Math.floor(random() * casterState.hand.length);
-      const discarded = casterState.hand[discardIdx];
-      casterState.hand = casterState.hand.filter((_, idx) => idx !== discardIdx);
-      casterState.graveyard = [...casterState.graveyard, discarded];
+  const drawCardsForCaster = (drawCount: number) => {
+    for (let drawNumber = 0; drawNumber < drawCount; drawNumber += 1) {
+      const drawnState = drawCard(playerId === 'PLAYER' ? pState1 : pState2);
+      if (playerId === 'PLAYER') pState1 = drawnState;
+      else pState2 = drawnState;
     }
-  }
+  };
 
-  if (card.id === 'prision-glacial' && targetPos) {
-    const key = `${targetPos.x},${targetPos.y}`;
-    const targetEnt = nextBoard[key];
-    if (targetEnt) {
-      targetEnt.frozenTurns = Math.max(targetEnt.frozenTurns, 2);
-    }
-  }
+  // Resolve structured direct-damage spells.
+  const directDamageEffect = getDirectDamageSpellDefinition(card.id);
+  if (directDamageEffect && targetPos) {
+    dealDamageAtKey(`${targetPos.x},${targetPos.y}`, directDamageEffect.damage);
 
-  if (card.id === 'cometa-arcano' && targetPos) {
-    const key = `${targetPos.x},${targetPos.y}`;
-    dealDamageAtKey(key, 4);
-    // Draw a card
     const casterState = playerId === 'PLAYER' ? pState1 : pState2;
-    const drawn = drawCard(casterState);
-    if (playerId === 'PLAYER') pState1 = drawn;
-    else pState2 = drawn;
+    const discardCount = Math.min(directDamageEffect.discardRandomCards ?? 0, casterState.hand.length);
+    for (let discardNumber = 0; discardNumber < discardCount; discardNumber += 1) {
+      const discardTag = discardNumber === 0
+        ? `${card.id}:discard`
+        : `${card.id}:discard:${discardNumber}`;
+      const random = createActionRandom(state, playerId, discardTag);
+      const discardIndex = Math.floor(random() * casterState.hand.length);
+      const discardedCard = casterState.hand[discardIndex];
+      casterState.hand = casterState.hand.filter((_, index) => index !== discardIndex);
+      casterState.graveyard = [...casterState.graveyard, discardedCard];
+    }
+
+    drawCardsForCaster(directDamageEffect.drawCards ?? 0);
   }
 
-  if (card.id === 'espora-venenosa' && targetPos) {
-    dealDamageAtKey(`${targetPos.x},${targetPos.y}`, 2);
-  }
+  // Resolve structured freeze spells.
+  const freezeEffect = getFreezeSpellDefinition(card.id);
+  if (freezeEffect && targetPos) {
+    let canResolveEffect = true;
+    if (freezeEffect.requiresAdjacentCommander) {
+      const commanderId = playerId === 'PLAYER' ? 'commander-player' : 'commander-opponent';
+      const commander = Object.values(state.board).find((entity) => entity.id === commanderId);
+      canResolveEffect = Boolean(
+        commander && isAdjacent(commander.position, targetPos, false),
+      );
+    }
 
-  if ((card.id === 'juicio-divino' || card.id === 'pesadilla-mortal') && targetPos) {
-    dealDamageAtKey(`${targetPos.x},${targetPos.y}`, 3);
-  }
-
-  if (card.id === 'destello-runico' && targetPos) {
-    // Find commander of player
-    const cmdId = playerId === 'PLAYER' ? 'commander-player' : 'commander-opponent';
-    const cmdEnt = Object.values(state.board).find(ent => ent.id === cmdId);
-    if (cmdEnt && isAdjacent(cmdEnt.position, targetPos, false)) {
-      const key = `${targetPos.x},${targetPos.y}`;
-      const targetEnt = nextBoard[key];
-      if (targetEnt) {
-        targetEnt.frozenTurns = Math.max(targetEnt.frozenTurns, 1);
+    if (canResolveEffect && freezeEffect.targetMode === 'single-entity') {
+      const targetEntity = nextBoard[`${targetPos.x},${targetPos.y}`];
+      const controllerAllowed = freezeEffect.targetController === 'any'
+        || targetEntity?.controller !== playerId;
+      const obstacleAllowed = !freezeEffect.excludesObstacles
+        || !isBoardObstacle(targetEntity);
+      if (targetEntity && controllerAllowed && obstacleAllowed) {
+        targetEntity.frozenTurns = Math.max(targetEntity.frozenTurns, freezeEffect.duration);
       }
-      const casterState = playerId === 'PLAYER' ? pState1 : pState2;
-      const drawn = drawCard(casterState);
-      if (playerId === 'PLAYER') pState1 = drawn;
-      else pState2 = drawn;
     }
+
+    if (canResolveEffect && freezeEffect.targetMode === 'column') {
+      for (const entity of Object.values(nextBoard)) {
+        if (entity.position.x !== targetPos.x) continue;
+        if (freezeEffect.excludesObstacles && isBoardObstacle(entity)) continue;
+        if (freezeEffect.targetController === 'enemy' && entity.controller === playerId) continue;
+        if (
+          freezeEffect.respectsSpellImmunity
+          && cardHasKeyword(CARDS_DB[entity.cardId], 'spell-immunity')
+        ) continue;
+        entity.frozenTurns = Math.max(entity.frozenTurns, freezeEffect.duration);
+      }
+    }
+
+    if (canResolveEffect) drawCardsForCaster(freezeEffect.drawCards ?? 0);
   }
 
   if (card.id === 'vortice-mana' && targetPos) {
@@ -1129,34 +1139,6 @@ export function playSpell(
       const ent = nextBoard[key];
       if (ent.id === 'commander-player' || ent.id === 'commander-opponent') continue;
       dealDamageAtKey(key, 2);
-    }
-  }
-
-  // Congelación Rápida: Freeze 1 enemy unit, draw 1 card
-  if (card.id === 'congelacion-rapida' && targetPos) {
-    const key = `${targetPos.x},${targetPos.y}`;
-    const targetEnt = nextBoard[key];
-    if (targetEnt && !isBoardObstacle(targetEnt) && targetEnt.controller !== playerId) {
-      targetEnt.frozenTurns = Math.max(targetEnt.frozenTurns, 1);
-    }
-    const casterState = playerId === 'PLAYER' ? pState1 : pState2;
-    const drawn = drawCard(casterState);
-    if (playerId === 'PLAYER') pState1 = drawn;
-    else pState2 = drawn;
-  }
-
-  // Tormenta de Maná: Freeze all enemies in a column (same X coordinate as targetPos)
-  if (card.id === 'tormenta-mana' && targetPos) {
-    const targetX = targetPos.x;
-    for (const key of Object.keys(nextBoard)) {
-      const ent = nextBoard[key];
-      if (!ent) continue;
-      if (!isBoardObstacle(ent) && ent.controller !== playerId && ent.position.x === targetX) {
-        // Respect spell immunity
-        const entCard = CARDS_DB[ent.cardId];
-        if (entCard && entCard.rulesText.includes('Inmune a Hechizos')) continue;
-        ent.frozenTurns = Math.max(ent.frozenTurns, 1);
-      }
     }
   }
 

@@ -12,7 +12,8 @@ import {
   Zap,
   type LucideIcon,
 } from 'lucide-react';
-import { getCardKeywords, type CardKeywordId } from '../core/cardKeywords';
+import type { Card } from '../types/card';
+import { getCardKeywordDefinitions, type CardKeywordId } from '../core/cardKeywords';
 
 const KEYWORD_ICONS: Record<CardKeywordId, LucideIcon> = {
   charge: Zap,
@@ -28,12 +29,13 @@ const KEYWORD_ICONS: Record<CardKeywordId, LucideIcon> = {
 };
 
 interface CardKeywordBadgesProps {
-  rulesText: string;
+  card: Pick<Card, 'id' | 'keywords' | 'rulesText'> | undefined;
   compact?: boolean;
 }
 
-export const CardKeywordBadges: React.FC<CardKeywordBadgesProps> = ({ rulesText, compact = false }) => {
-  const keywords = getCardKeywords(rulesText);
+export const CardKeywordBadges: React.FC<CardKeywordBadgesProps> = ({ card, compact = false }) => {
+  if (!card) return null;
+  const keywords = getCardKeywordDefinitions(card);
   if (keywords.length === 0) return null;
 
   return (

@@ -1,4 +1,5 @@
 import type { OnlineRole } from './types';
+import { readLocalStorage, removeLocalStorage, writeLocalStorage } from '../utils/safeStorage';
 
 const ONLINE_SESSION_STORAGE_KEY = 'nexo-online-session-v1';
 
@@ -24,16 +25,13 @@ export function parseStoredOnlineSession(value: string | null): StoredOnlineSess
 }
 
 export function loadStoredOnlineSession(): StoredOnlineSession | null {
-  if (typeof window === 'undefined') return null;
-  return parseStoredOnlineSession(window.localStorage.getItem(ONLINE_SESSION_STORAGE_KEY));
+  return parseStoredOnlineSession(readLocalStorage(ONLINE_SESSION_STORAGE_KEY));
 }
 
 export function saveStoredOnlineSession(session: StoredOnlineSession): void {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(ONLINE_SESSION_STORAGE_KEY, JSON.stringify(session));
+  writeLocalStorage(ONLINE_SESSION_STORAGE_KEY, JSON.stringify(session));
 }
 
 export function clearStoredOnlineSession(): void {
-  if (typeof window === 'undefined') return;
-  window.localStorage.removeItem(ONLINE_SESSION_STORAGE_KEY);
+  removeLocalStorage(ONLINE_SESSION_STORAGE_KEY);
 }

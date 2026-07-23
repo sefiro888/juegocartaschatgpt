@@ -25,6 +25,8 @@ import {
   type WorldPoint,
 } from '../../core/boardVisualLayout';
 import { getReachablePositions, isBoardObstacle, positionKey } from '../../core/boardPathfinding';
+import { cardHasKeyword } from '../../core/cardKeywords';
+import { getFreezeSpellDefinition } from '../../core/spellEffectsCatalog';
 
 type NodeHighlight = 'summon' | 'move' | 'attack' | 'spell' | null;
 
@@ -488,23 +490,6 @@ const TacticalPreviewPanel: React.FC<TacticalPreviewPanelProps> = ({
   </aside>
 );
 
-function isEntityVisible(
-  entity: BoardEntity,
-  board: Record<string, BoardEntity>,
-  localController: 'PLAYER' | 'OPPONENT',
-): boolean {
-  if (entity.controller === localController || entity.cardId.startsWith('obstaculo-')) return true;
-  if (entity.position.y <= 2) return true;
-
-  return Object.values(board)
-    .filter((candidate) => candidate.controller === localController)
-    .some((playerEntity) => {
-      const deltaX = Math.abs(playerEntity.position.x - entity.position.x);
-      const deltaY = Math.abs(playerEntity.position.y - entity.position.y);
-      return deltaX + deltaY <= 2;
-    });
-}
-
 interface ResponsiveCameraProps {
   resetToken: number;
 }
@@ -699,7 +684,7 @@ export const Board3D: React.FC = () => {
       getMovementAllowance(gameState, selectedEntity),
       {
         allowDiagonal: true,
-        canFly: card.rulesText.includes('Vuelo'),
+        canFly: cardHasKeyword(card, 'flying'),
       },
     )) {
       routes.set(positionKey(reachable.position), reachable.path);
@@ -721,9 +706,10 @@ export const Board3D: React.FC = () => {
       if (selectedCardInHand?.type === 'HECHIZO') {
         if (occupant && (
           (isBoardObstacle(occupant) && canSpellTargetObstacle(selectedCardInHand.id))
-          || (!isBoardObstacle(occupant) && !CARDS_DB[occupant.cardId]?.rulesText.includes('Inmune a Hechizos'))
+          || (!isBoardObstacle(occupant) && !cardHasKeyword(CARDS_DB[occupant.cardId], 'spell-immunity'))
         )) {
-          if (selectedCardInHand.id === 'destello-runico') {
+          const freezeEffect = getFreezeSpellDefinition(selectedCardInHand.id);
+          if (freezeEffect?.requiresAdjacentCommander) {
             const commander = Object.values(gameState.board).find(
               (entity) => entity.id === (localController === 'PLAYER' ? 'commander-player' : 'commander-opponent'),
             );
@@ -1000,7 +986,6 @@ export const Board3D: React.FC = () => {
                 visualNode={visualNode}
                 isSelected={selectedEntity?.id === entity.id}
                 isHovered={hoveredEntity?.id === entity.id}
-                isHidden={!isEntityVisible(entity, gameState.board, localController)}
                 movementRoute={movementAnimationRoutes[entity.id]}
                 attackTarget={attackTargetNode?.worldPosition}
                 attackPulseId={attackAnimation?.id}

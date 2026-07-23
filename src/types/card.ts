@@ -12,6 +12,20 @@ export type CardType = z.infer<typeof CardTypeSchema>;
 export const RaritySchema = z.enum(['COMUN', 'RARA', 'EPICA', 'LEGENDARIA']);
 export type Rarity = z.infer<typeof RaritySchema>;
 
+export const CardKeywordIdSchema = z.enum([
+  'charge',
+  'flying',
+  'resistance',
+  'freeze',
+  'battlecry',
+  'last-breath',
+  'obstruction',
+  'diagonal',
+  'spell-immunity',
+  'cover',
+]);
+export type CardKeywordId = z.infer<typeof CardKeywordIdSchema>;
+
 export const CardCostSchema = z.object({
   generic: z.number().min(0),
   furia: z.number().min(0).optional(),
@@ -32,6 +46,7 @@ export const CardSchema = z.object({
   cost: CardCostSchema,
   rarity: RaritySchema,
   rulesText: z.string(),
+  keywords: z.array(CardKeywordIdSchema).optional(),
   flavorText: z.string(),
   attack: z.number().min(0).optional(),
   maxHealth: z.number().min(1).optional(),

@@ -19,6 +19,13 @@ import {
   summonUnit,
 } from './engine';
 import { getDeckDefinition } from './deckCatalog';
+import { cardHasKeyword } from './cardKeywords';
+import {
+  DIRECT_DAMAGE_SPELL_IDS,
+  FREEZE_SPELL_IDS,
+  getDirectDamageSpellDefinition,
+  getFreezeSpellDefinition,
+} from './spellEffectsCatalog';
 
 type Controller = 'PLAYER' | 'OPPONENT';
 
@@ -33,19 +40,19 @@ export interface MatchSimulationResult {
   actions: Record<SimulatedActionKind, number>;
 }
 
-const SUPPORTED_ENEMY_SPELLS = new Set([
-  'lluvia-ceniza',
-  'chispa-fugaz',
-  'prision-glacial',
-  'cometa-arcano',
+const SUPPORTED_ENEMY_SPELLS = new Set<string>([
+  ...DIRECT_DAMAGE_SPELL_IDS,
+  ...FREEZE_SPELL_IDS.filter(
+    (cardId) => getFreezeSpellDefinition(cardId)?.targetMode === 'single-entity',
+  ),
   'vortice-mana',
-  'congelacion-rapida',
-  'espora-venenosa',
-  'juicio-divino',
-  'pesadilla-mortal',
 ]);
 const SUPPORTED_FRIENDLY_SPELLS = new Set(['impetu-fuego', 'furia-nexo']);
-const SUPPORTED_COLUMN_SPELLS = new Set(['tormenta-mana']);
+const SUPPORTED_COLUMN_SPELLS = new Set<string>(
+  FREEZE_SPELL_IDS.filter(
+    (cardId) => getFreezeSpellDefinition(cardId)?.targetMode === 'column',
+  ),
+);
 const SUPPORTED_NO_TARGET_SPELLS = new Set(['erupcion-volcanica']);
 
 function isSupportedSpell(card: Card): boolean {
@@ -113,9 +120,9 @@ function totalCost(card: Card): number {
 function summonPriority(card: Card): number {
   const cost = Math.max(1, totalCost(card));
   if (card.type === 'ESTRUCTURA') return ((card.maxHealth ?? 1) + 2) / cost;
-  const keywordBonus = (card.rulesText.includes('Carga') ? 4 : 0)
-    + (card.rulesText.includes('Vuelo') ? 2 : 0)
-    + (card.rulesText.includes('Resistencia') ? 2 : 0);
+  const keywordBonus = (cardHasKeyword(card, 'charge') ? 4 : 0)
+    + (cardHasKeyword(card, 'flying') ? 2 : 0)
+    + (cardHasKeyword(card, 'resistance') ? 2 : 0);
   return (((card.attack ?? 0) * 2) + (card.maxHealth ?? 1) + ((card.movement ?? 1) * 2) + keywordBonus) / cost;
 }
 
@@ -190,15 +197,7 @@ function selectEnemySpellTarget(
       .sort((left, right) => right.attack - left.attack || right.health - left.health)[0]?.position;
   }
 
-  const damageByCardId: Record<string, number> = {
-    'chispa-fugaz': 2,
-    'lluvia-ceniza': 3,
-    'cometa-arcano': 4,
-    'espora-venenosa': 2,
-    'juicio-divino': 3,
-    'pesadilla-mortal': 3,
-  };
-  const damage = damageByCardId[card.id] ?? 0;
+  const damage = getDirectDamageSpellDefinition(card.id)?.damage ?? 0;
   const killable = enemies
     .filter((entity) => !isCommander(entity) && damage > 0 && entity.health <= damage)
     .sort((left, right) => right.attack - left.attack || right.health - left.health)[0];
@@ -308,7 +307,7 @@ function moveTowardEnemy(
     const currentDistance = getDistance(unit.position, enemyCommander.position);
     const destination = getReachablePositions(state.board, unit.position, getMovementAllowance(state, unit), {
       allowDiagonal: true,
-      canFly: card.rulesText.includes('Vuelo'),
+      canFly: cardHasKeyword(card, 'flying'),
     })
       .sort((left, right) =>
         getDistance(left.position, enemyCommander.position) - getDistance(right.position, enemyCommander.position)

@@ -21,7 +21,6 @@ interface Card3DProps {
   visualNode: BoardVisualNode;
   isSelected?: boolean;
   isHovered?: boolean;
-  isHidden?: boolean; // FOG OF WAR prop
   movementRoute?: Position[];
   attackTarget?: WorldPoint;
   attackPulseId?: string;
@@ -36,7 +35,6 @@ export const Card3D: React.FC<Card3DProps> = ({
   visualNode,
   isSelected = false,
   isHovered = false,
-  isHidden = false,
   movementRoute,
   attackTarget,
   attackPulseId,
@@ -203,7 +201,6 @@ export const Card3D: React.FC<Card3DProps> = ({
 
   // Rarity color tags
   const getRarityBorderColor = (rarity: string) => {
-    if (isHidden) return '#2b3b5c';
     switch (rarity) {
       case 'LEGENDARIA': return '#fbbf24';
       case 'EPICA': return '#a855f7';
@@ -215,6 +212,8 @@ export const Card3D: React.FC<Card3DProps> = ({
   const isStructure = cardData.type === 'ESTRUCTURA';
   const hasStats = cardData.type === 'UNIDAD' || cardData.type === 'COMANDANTE' || isStructure;
   const factionCosts = getCardFactionCosts(cardData);
+  const totalCost = cardData.cost.generic + factionCosts.reduce((total, cost) => total + cost.amount, 0);
+  const isDamaged = entity.health < entity.maxHealth;
 
   return (
     <group
@@ -280,7 +279,7 @@ export const Card3D: React.FC<Card3DProps> = ({
         </mesh>
       )}
 
-      {damageFeedback && !isHidden && (
+      {damageFeedback && (
         <Html
           key={damageFeedback.id}
           center
@@ -301,7 +300,7 @@ export const Card3D: React.FC<Card3DProps> = ({
       >
         <boxGeometry args={[1.35, 1.85, 0.08]} />
         <meshStandardMaterial
-          color={isSelected ? '#fbbf24' : isHovered ? '#fff' : isHidden ? '#0a0d14' : isOpponent ? '#2d1818' : '#14202d'}
+          color={isSelected ? '#fbbf24' : isHovered ? '#fff' : isOpponent ? '#2d1818' : '#14202d'}
           roughness={0.4}
           metalness={0.3}
         />
@@ -322,13 +321,14 @@ export const Card3D: React.FC<Card3DProps> = ({
           <div
             data-entity-id={entity.id}
             data-logical-position={`${logicalX},${logicalY}`}
+            data-card-visibility="public"
             className={[
               'card3d-face',
-              isHidden ? 'hidden-fog' : factionVisual.className,
+              factionVisual.className,
               isSelected ? 'selected' : '',
               isHovered ? 'hovered' : '',
-              (isLegendaria && !isHidden) ? 'rarity-legendaria' : '',
-              (isEpica && !isHidden) ? 'rarity-epica' : '',
+              isLegendaria ? 'rarity-legendaria' : '',
+              isEpica ? 'rarity-epica' : '',
             ].filter(Boolean).join(' ')}
             style={{
               borderColor: getRarityBorderColor(cardData.rarity),
@@ -339,74 +339,79 @@ export const Card3D: React.FC<Card3DProps> = ({
 
             {/* Header nameplate */}
             <div className="card3d-header">
-              <span className="card3d-name">{isHidden ? 'Criatura Oculta' : cardData.name}</span>
+              <span className="card3d-name">{cardData.name}</span>
             </div>
 
             <div
               className="card3d-cost"
               style={{
-                display: !isHidden && cardData.type !== 'MANA' ? 'flex' : 'none',
+                display: cardData.type !== 'MANA' ? 'flex' : 'none',
                 '--mana-accent': factionVisual.accent,
               } as React.CSSProperties}
             >
-              <span className="card3d-generic" style={{ display: cardData.cost.generic > 0 ? 'flex' : 'none' }}>
+              <span className="card3d-cost-total">
                 <Gem aria-hidden="true" />
-                {cardData.cost.generic}
+                <strong>{totalCost}</strong>
+                <small>MANA</small>
               </span>
-              {factionCosts.map(({ manaType, amount }) => {
-                const visual = getFactionVisual(manaTypeToFaction(manaType));
-                return (
-                  <span
-                    key={manaType}
-                    className="card3d-faction-cost"
-                    style={{
-                      color: visual.softAccent,
-                      '--segment-accent': visual.accent,
-                    } as React.CSSProperties}
-                  >
-                    <i>{visual.icon}</i>{amount}
-                  </span>
-                );
-              })}
+              <span className="card3d-cost-parts" style={{ display: factionCosts.length > 0 ? 'flex' : 'none' }}>
+                <span className="card3d-generic" style={{ display: cardData.cost.generic > 0 ? 'flex' : 'none' }}>
+                  +{cardData.cost.generic}
+                </span>
+                {factionCosts.map(({ manaType, amount }) => {
+                  const visual = getFactionVisual(manaTypeToFaction(manaType));
+                  return (
+                    <span
+                      key={manaType}
+                      className="card3d-faction-cost"
+                      style={{
+                        color: visual.softAccent,
+                        '--segment-accent': visual.accent,
+                      } as React.CSSProperties}
+                    >
+                      <i>{visual.icon}</i>{amount}
+                    </span>
+                  );
+                })}
+              </span>
             </div>
 
             {/* Framed Art illustration */}
             <div className="card3d-art">
-              {isHidden ? (
-                <div className="hidden-fog-art">?</div>
-              ) : (
-                <img
-                  src={resolvePublicAsset(cardData.artPath)}
-                  alt=""
-                  className={artLoaded ? 'is-loaded' : ''}
-                  loading="eager"
-                  decoding="async"
-                  onLoad={() => setArtLoaded(true)}
-                />
-              )}
+              <img
+                src={resolvePublicAsset(cardData.artPath)}
+                alt=""
+                className={artLoaded ? 'is-loaded' : ''}
+                loading="eager"
+                decoding="async"
+                onLoad={() => setArtLoaded(true)}
+              />
             </div>
 
             {/* Back watermark icon */}
             <div className="card3d-watermark">
-              {isHidden ? '?' : factionVisual.icon}
+              {factionVisual.icon}
             </div>
 
             {/* Runic Stat medals (Static rendering, toggle display property to avoid DOM node addition/removal crashes) */}
-            <div className="card3d-stats" style={{ display: hasStats && !isHidden ? 'flex' : 'none' }}>
+            <div className="card3d-stats" style={{ display: hasStats ? 'flex' : 'none' }}>
               <div className="stat3d-badge att" style={{ display: !isStructure ? 'flex' : 'none' }}>
                 <span className="badge-ring" />
-                <Sword className="stat3d-icon" aria-hidden="true" />
-                <span className="val">{entity.attack}</span>
+                <span className="stat3d-icon-well"><Sword className="stat3d-icon" aria-hidden="true" /></span>
+                <span className="stat3d-copy"><strong className="val">{entity.attack}</strong><small>ATQ</small></span>
               </div>
-              <div className="stat3d-badge hp">
+              <div className={`stat3d-badge hp ${isDamaged ? 'damaged' : ''}`}>
                 <span className="badge-ring" />
-                <Shield className="stat3d-icon" aria-hidden="true" />
-                <span className="val">{entity.health}</span>
+                <span className="stat3d-icon-well"><Shield className="stat3d-icon" aria-hidden="true" /></span>
+                <span className="stat3d-copy">
+                  <span><strong className="val">{entity.health}</strong>{isDamaged && <em>/{entity.maxHealth}</em>}</span>
+                  <small>VIDA</small>
+                </span>
               </div>
             </div>
 
             {/* Frozen status overlay (Static render, display toggle) */}
-            <div className="frozen-overlay" style={{ display: entity.frozenTurns > 0 && !isHidden ? 'flex' : 'none' }}>
+            <div className="frozen-overlay" style={{ display: entity.frozenTurns > 0 ? 'flex' : 'none' }}>
               CONGELADO ❄️
             </div>
             
@@ -432,23 +437,6 @@ export const Card3D: React.FC<Card3DProps> = ({
               box-shadow: 0 6px 15px rgba(0,0,0,0.8);
             }
             
-            .card3d-face.hidden-fog {
-              background: radial-gradient(circle at center, #1b212f 0%, #080b11 100%);
-              border-color: #2b3b5c;
-            }
-            .hidden-fog-art {
-              width: 100%;
-              height: 100%;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-size: 3rem;
-              font-weight: 800;
-              color: #4f46e5;
-              text-shadow: 0 0 10px rgba(99, 102, 241, 0.6);
-              background: #080b11;
-            }
-
             .card3d-face.furia {
               background: linear-gradient(to bottom, #160707, #070303);
             }
@@ -491,7 +479,7 @@ export const Card3D: React.FC<Card3DProps> = ({
 
             .card3d-header {
               min-height: 27px;
-              padding: 5px 43px 5px 8px;
+              padding: 5px 55px 5px 8px;
               background: linear-gradient(90deg, rgba(255,255,255,0.01) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.01) 100%);
               border-bottom: 1px solid rgba(255,255,255,0.1);
               display: flex;
@@ -514,36 +502,78 @@ export const Card3D: React.FC<Card3DProps> = ({
 
             .card3d-cost {
               position: absolute;
-              top: 5px;
-              right: 6px;
+              top: 4px;
+              right: 5px;
               z-index: 20;
-              min-height: 24px;
+              height: 31px;
               align-items: center;
-              gap: 1px;
+              gap: 2px;
               padding: 2px;
+              border: 1px solid color-mix(in srgb, var(--mana-accent) 66%, white 10%);
+              border-radius: 9px 4px 9px 4px;
+              background: linear-gradient(145deg, rgba(47,57,73,0.98), rgba(8,12,19,0.98) 62%);
+              box-shadow: 0 4px 8px rgba(0,0,0,0.78), 0 0 9px color-mix(in srgb, var(--mana-accent) 34%, transparent);
+            }
+
+            .card3d-cost-total {
+              display: grid;
+              grid-template-columns: 8px auto;
+              grid-template-rows: 1fr 6px;
+              min-width: 27px;
+              height: 25px;
+              align-items: center;
+              justify-content: center;
+              gap: 0 1px;
               overflow: hidden;
-              border: 1px solid color-mix(in srgb, var(--mana-accent) 62%, white 8%);
-              border-radius: 8px 8px 10px 10px;
-              background: linear-gradient(145deg, rgba(255,255,255,0.15), transparent 42%), #10141d;
-              box-shadow: 0 3px 7px rgba(0,0,0,0.75), 0 0 7px color-mix(in srgb, var(--mana-accent) 32%, transparent);
-              font-size: 0.55rem;
-              font-weight: 900;
+              border: 1px solid color-mix(in srgb, var(--mana-accent) 48%, white 10%);
+              border-radius: 7px 3px 7px 3px;
+              background: radial-gradient(circle at 50% 120%, color-mix(in srgb, var(--mana-accent) 56%, transparent), transparent 62%), #151c28;
+              box-shadow: inset 0 1px rgba(255,255,255,0.18);
+            }
+
+            .card3d-cost-total svg {
+              width: 7px;
+              height: 7px;
+              color: color-mix(in srgb, var(--mana-accent) 62%, white);
+              filter: drop-shadow(0 0 3px var(--mana-accent));
+            }
+
+            .card3d-cost-total strong {
+              font-size: 0.72rem;
+              line-height: 1;
+            }
+
+            .card3d-cost-total small {
+              grid-column: 1 / -1;
+              color: rgba(230,240,247,0.6);
+              font-size: 0.24rem;
+              line-height: 1;
+              text-align: center;
+              letter-spacing: 0.08em;
+            }
+
+            .card3d-cost-parts {
+              flex-direction: column;
+              justify-content: center;
+              gap: 1px;
             }
 
             .card3d-generic,
             .card3d-faction-cost {
-              min-width: 18px;
-              height: 18px;
+              min-width: 17px;
+              height: 11px;
               align-items: center;
               justify-content: center;
               gap: 1px;
-              border-radius: 5px;
+              border: 1px solid rgba(255,255,255,0.08);
+              border-radius: 3px;
               background: rgba(255,255,255,0.08);
+              font-size: 0.38rem;
+              font-weight: 900;
             }
 
-            .card3d-generic svg {
-              width: 7px;
-              height: 7px;
+            .card3d-generic {
+              color: #c8d6df;
             }
 
             .card3d-faction-cost {
@@ -552,12 +582,12 @@ export const Card3D: React.FC<Card3DProps> = ({
 
             .card3d-faction-cost i {
               display: grid;
-              width: 9px;
-              height: 9px;
+              width: 7px;
+              height: 7px;
               place-items: center;
               border: 1px solid currentColor;
               border-radius: 50%;
-              font-size: 0.32rem;
+              font-size: 0.26rem;
               font-style: normal;
               line-height: 1;
             }
@@ -613,37 +643,76 @@ export const Card3D: React.FC<Card3DProps> = ({
             }
 
             .stat3d-badge {
-              width: 31px;
-              height: 28px;
-              border-radius: 8px 8px 10px 10px;
+              width: 39px;
+              height: 31px;
               display: flex;
               align-items: center;
               justify-content: center;
               gap: 2px;
-              font-size: 0.76rem;
-              font-weight: 900;
+              padding: 2px 3px;
+              overflow: hidden;
               position: relative;
               box-shadow: 0 3px 6px rgba(0,0,0,0.7);
               border: 1px solid;
+              box-sizing: border-box;
             }
             
             .badge-ring {
               position: absolute;
               inset: 2px;
               border: 1px solid rgba(255,255,255,0.12);
-              border-radius: 6px 6px 8px 8px;
+              border-radius: inherit;
             }
+
+            .stat3d-icon-well {
+              z-index: 1;
+              display: grid;
+              width: 13px;
+              height: 19px;
+              place-items: center;
+              border-right: 1px solid rgba(255,255,255,0.13);
+            }
+
             .stat3d-icon {
-              width: 9px;
-              height: 9px;
+              width: 10px;
+              height: 10px;
               z-index: 1;
             }
+
+            .stat3d-copy {
+              z-index: 1;
+              display: flex;
+              min-width: 17px;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              line-height: 1;
+            }
+
             .val {
               z-index: 1;
+              font-size: 0.73rem;
+              font-style: normal;
               text-shadow: 0 1px 2px rgba(0,0,0,0.8);
             }
 
+            .stat3d-copy small {
+              margin-top: 1px;
+              color: rgba(255,255,255,0.62);
+              font-size: 0.25rem;
+              font-weight: 900;
+              letter-spacing: 0.06em;
+            }
+
+            .stat3d-copy em {
+              color: rgba(255,255,255,0.66);
+              font-size: 0.36rem;
+              font-style: normal;
+              font-weight: 800;
+            }
+
             .stat3d-badge.att {
+              border-radius: 5px 10px 5px 10px;
               background: linear-gradient(145deg, #b52b2b, #651515 52%, #260707);
               color: #fff2ed;
               border-color: #ff6b4a;
@@ -651,10 +720,18 @@ export const Card3D: React.FC<Card3DProps> = ({
             }
             .stat3d-badge.hp {
               margin-left: auto;
+              border-radius: 10px 10px 6px 6px;
               background: linear-gradient(145deg, #16865f, #07523e 52%, #02251d);
               color: #eafff6;
               border-color: #42e2aa;
               box-shadow: 0 0 7px rgba(46,218,157,0.4), 0 3px 6px rgba(0,0,0,0.7);
+            }
+
+            .stat3d-badge.hp.damaged {
+              color: #fff1d6;
+              border-color: #ffb14f;
+              background: linear-gradient(145deg, #8a4b16, #51300f 52%, #251305);
+              box-shadow: 0 0 8px rgba(255,154,55,0.52), 0 3px 6px rgba(0,0,0,0.7);
             }
 
             .frozen-overlay {
