@@ -1,11 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Check, Gem, LockKeyhole, Shield, Sword } from 'lucide-react';
 import type { Card } from '../types/card';
+import { getCardArtCandidates } from '../core/publicAssets';
+import { getFactionVisual } from '../core/factionVisuals';
+import { getCardFactionCosts, manaTypeToFaction } from '../core/factionRules';
+import { CardKeywordBadges } from './CardKeywordBadges';
 
 interface CardDOMProps {
   card: Card;
   mode?: 'thumbnail' | 'hand' | 'board' | 'gallery' | 'inspected' | 'deck-preview';
   isSelected?: boolean;
   isPlayable?: boolean;
+  availability?: 'neutral' | 'ready' | 'blocked' | 'waiting';
+  availabilityLabel?: string;
   onClick?: () => void;
 }
 
@@ -14,18 +21,23 @@ export const CardDOM: React.FC<CardDOMProps> = ({
   mode = 'gallery',
   isSelected = false,
   isPlayable = false,
+  availability = 'neutral',
+  availabilityLabel,
   onClick,
 }) => {
-  const [imgSrc, setImgSrc] = useState(`/assets/cards/art/${card.id}.webp`);
+  const artCandidates = useMemo(
+    () => getCardArtCandidates(card),
+    [card],
+  );
+  const [artCandidateIndex, setArtCandidateIndex] = useState(0);
+  const imgSrc = artCandidates[Math.min(artCandidateIndex, artCandidates.length - 1)];
 
   useEffect(() => {
-    setImgSrc(`/assets/cards/art/${card.id}.webp`);
-  }, [card.id]);
+    setArtCandidateIndex(0);
+  }, [artCandidates]);
 
   const handleImageError = () => {
-    if (imgSrc.endsWith('.webp')) {
-      setImgSrc(`/assets/cards/art/${card.id}.svg`);
-    }
+    setArtCandidateIndex((current) => Math.min(current + 1, artCandidates.length - 1));
   };
 
   const getRarityColor = (rarity: string) => {
@@ -38,22 +50,37 @@ export const CardDOM: React.FC<CardDOMProps> = ({
   };
 
   const isMana = card.type === 'MANA';
-  const factionClass = card.faction === 'FURIA' ? 'furia-card' : 'arcano-card';
+  const factionVisual = getFactionVisual(card.faction);
+  const factionClass = `${factionVisual.className}-card`;
   const isLarge = mode === 'gallery' || mode === 'inspected';
   const isBoard = mode === 'board';
   const isLegendaria = card.rarity === 'LEGENDARIA';
   const isEpica = card.rarity === 'EPICA';
   const hasStats = (card.type === 'UNIDAD' || card.type === 'COMANDANTE' || card.type === 'ESTRUCTURA') && mode !== 'thumbnail' && mode !== 'board';
+  const factionCosts = getCardFactionCosts(card);
+  const totalCost = card.cost.generic + factionCosts.reduce((total, cost) => total + cost.amount, 0);
+  const displayedHealth = mode === 'board' && card.health !== undefined ? card.health : card.maxHealth;
+  const isDamaged = displayedHealth !== undefined && card.maxHealth !== undefined && displayedHealth < card.maxHealth;
 
   return (
     <div
       onClick={onClick}
+      onKeyDown={(event) => {
+        if (onClick && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          onClick();
+        }
+      }}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? `Ver detalles de ${card.name}` : undefined}
       className={[
         'card-container',
         factionClass,
         `mode-${mode}`,
         isSelected ? 'selected' : '',
         isPlayable ? 'playable' : '',
+        availability !== 'neutral' ? `availability-${availability}` : '',
         isLegendaria ? 'rarity-legendaria' : '',
         isEpica ? 'rarity-epica' : '',
       ].filter(Boolean).join(' ')}
@@ -70,13 +97,53 @@ export const CardDOM: React.FC<CardDOMProps> = ({
 
       {/* COST CONTAINER (only for non-mana cards) */}
       {!isMana && mode !== 'thumbnail' && mode !== 'board' && (
-        <div className="card-cost-badge">
-          {card.cost.generic > 0 && <span className="generic-cost">{card.cost.generic}</span>}
-          {card.faction === 'FURIA' && card.cost.furia ? (
-            <span className="faction-cost furia-icon">🔥{card.cost.furia}</span>
-          ) : card.faction === 'ARCANO' && card.cost.arcano ? (
-            <span className="faction-cost arcano-icon">❄️{card.cost.arcano}</span>
-          ) : null}
+        <div
+          className="card-cost-badge"
+          aria-label={`Coste total: ${totalCost} de mana`}
+          style={{
+            '--mana-accent': factionVisual.accent,
+            '--mana-soft': factionVisual.softAccent,
+          } as React.CSSProperties}
+        >
+          <span className="cost-crystal" title={`Coste total: ${totalCost}`}>
+            <Gem aria-hidden="true" />
+            <strong>{totalCost}</strong>
+            <small>MANA</small>
+          </span>
+          {factionCosts.length > 0 && (
+            <span className="cost-requirements" aria-label="Requisitos del coste">
+              {card.cost.generic > 0 && (
+                <span className="generic-cost" title={`Mana de cualquier faccion: ${card.cost.generic}`}>
+                  <span className="generic-rune">+</span>
+                  <strong>{card.cost.generic}</strong>
+                </span>
+              )}
+              {factionCosts.map(({ manaType, amount }) => {
+                const visual = getFactionVisual(manaTypeToFaction(manaType));
+                return (
+                  <span
+                    key={manaType}
+                    className={`faction-cost ${visual.className}-icon`}
+                    style={{
+                      color: visual.softAccent,
+                      '--segment-accent': visual.accent,
+                    } as React.CSSProperties}
+                    title={`Mana de ${manaType}: ${amount}`}
+                  >
+                    <span className="faction-rune">{visual.icon}</span>
+                    <strong>{amount}</strong>
+                  </span>
+                );
+              })}
+            </span>
+          )}
+        </div>
+      )}
+
+      {mode === 'hand' && availability !== 'neutral' && availabilityLabel && (
+        <div className={`card-availability ${availability}`} title={availabilityLabel}>
+          {availability === 'ready' ? <Check aria-hidden="true" /> : <LockKeyhole aria-hidden="true" />}
+          <span>{availabilityLabel}</span>
         </div>
       )}
 
@@ -105,10 +172,11 @@ export const CardDOM: React.FC<CardDOMProps> = ({
       {!isBoard && mode !== 'thumbnail' && (
         <div className={['card-body', hasStats ? 'has-stats' : ''].filter(Boolean).join(' ')}>
           {/* Watermark in background */}
-          <div className={`card-watermark ${card.faction === 'FURIA' ? 'furia-watermark' : 'arcano-watermark'}`}>
-            {card.faction === 'FURIA' ? '🔥' : '❄️'}
+          <div className={`card-watermark ${factionVisual.className + '-watermark'}`}>
+            {factionVisual.icon}
           </div>
 
+          <CardKeywordBadges card={card} compact={mode === 'hand'} />
           <div className="card-rules">{card.rulesText}</div>
           {isLarge && (card.range !== undefined || card.movement !== undefined) && (
             <div className="card-attributes-row">
@@ -130,15 +198,24 @@ export const CardDOM: React.FC<CardDOMProps> = ({
       {(card.type === 'UNIDAD' || card.type === 'COMANDANTE' || card.type === 'ESTRUCTURA') && mode !== 'thumbnail' && (
         <div className="card-stats">
           {card.attack !== undefined && (
-            <div className="stat-badge stat-attack-badge">
+            <div className="stat-badge stat-attack-badge" title={`Ataque: ${card.attack}`}>
               <span className="badge-ring" />
-              <span className="stat-val">{card.attack}</span>
+              <span className="stat-icon-well"><Sword className="stat-icon" aria-hidden="true" /></span>
+              <span className="stat-copy">
+                <strong className="stat-val">{card.attack}</strong>
+                <small className="stat-caption">ATQ</small>
+              </span>
             </div>
           )}
           {card.maxHealth !== undefined && (
-            <div className="stat-badge stat-health-badge">
+            <div className={`stat-badge stat-health-badge ${isDamaged ? 'is-damaged' : ''}`} title={`Vida: ${displayedHealth} de ${card.maxHealth}`}>
               <span className="badge-ring" />
-              <span className="stat-val">{mode === 'board' && card.health !== undefined ? card.health : card.maxHealth}</span>
+              <span className="stat-icon-well"><Shield className="stat-icon" aria-hidden="true" /></span>
+              <span className="stat-copy">
+                <strong className="stat-val">{displayedHealth}</strong>
+                {isDamaged && <span className="stat-max">/{card.maxHealth}</span>}
+                <small className="stat-caption">VIDA</small>
+              </span>
             </div>
           )}
         </div>
@@ -217,10 +294,34 @@ export const CardDOM: React.FC<CardDOMProps> = ({
           box-shadow: inset 0 0 15px rgba(0, 217, 255, 0.15), 0 8px 20px rgba(0,0,0,0.6);
         }
 
+        .naturaleza-card {
+          background: linear-gradient(135deg, #0b1d13 0%, #041008 100%);
+          box-shadow: inset 0 0 15px rgba(100, 227, 154, 0.14), 0 8px 20px rgba(0,0,0,0.6);
+        }
+
+        .orden-card {
+          background: linear-gradient(135deg, #211b0d 0%, #0d0c08 100%);
+          box-shadow: inset 0 0 15px rgba(232, 196, 108, 0.14), 0 8px 20px rgba(0,0,0,0.6);
+        }
+
+        .sombra-card {
+          background: linear-gradient(135deg, #170d22 0%, #09050f 100%);
+          box-shadow: inset 0 0 15px rgba(185, 156, 255, 0.14), 0 8px 20px rgba(0,0,0,0.6);
+        }
+
+        .vacio-card {
+          background: linear-gradient(135deg, #150b24 0%, #06030c 100%);
+          box-shadow: inset 0 0 15px rgba(213, 160, 255, 0.14), 0 8px 20px rgba(0,0,0,0.6);
+        }
+
         .selected {
           transform: translateY(-8px) scale(1.03) !important;
           box-shadow: 0 0 25px var(--rarity-legendaria) !important;
           border-color: var(--rarity-legendaria) !important;
+        }
+
+        .mode-hand.selected {
+          transform: none !important;
         }
 
         .playable {
@@ -271,36 +372,193 @@ export const CardDOM: React.FC<CardDOMProps> = ({
           mix-blend-mode: screen;
         }
 
-        /* Cost Badge - Runic Stone design */
+        /* Mana crystal: total cost first, colored requirements second. */
         .card-cost-badge {
           position: absolute;
-          top: 8px;
-          right: 10px;
+          top: 6px;
+          right: 8px;
           display: flex;
+          align-items: stretch;
           gap: 3px;
           z-index: 20;
-          background: radial-gradient(circle at 35% 35%, #2a2e3d, #12141a);
-          padding: 4px 9px;
-          border-radius: 20px;
-          font-size: 0.8rem;
-          font-weight: 800;
+          height: 42px;
+          padding: 3px;
+          border: 1px solid color-mix(in srgb, var(--mana-accent) 68%, #ffffff 12%);
+          border-radius: 13px 6px 13px 6px;
+          background: linear-gradient(145deg, rgba(42, 52, 67, 0.98), rgba(8, 12, 19, 0.98) 58%);
+          box-shadow:
+            0 6px 13px rgba(0,0,0,0.78),
+            0 0 14px color-mix(in srgb, var(--mana-accent) 35%, transparent),
+            inset 0 1px 0 rgba(255,255,255,0.24);
           font-family: var(--font-display);
-          box-shadow: 0 4px 8px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.15);
-          border: 1px solid rgba(255, 255, 255, 0.15);
+          white-space: nowrap;
         }
 
-        .generic-cost {
-          color: #fff;
+        .cost-crystal {
+          position: relative;
+          display: grid;
+          grid-template-columns: 12px auto;
+          grid-template-rows: 1fr 9px;
+          min-width: 39px;
+          padding: 2px 5px 1px;
+          align-items: center;
+          justify-content: center;
+          gap: 0 2px;
+          overflow: hidden;
+          border: 1px solid color-mix(in srgb, var(--mana-accent) 52%, white 12%);
+          border-radius: 9px 4px 9px 4px;
+          color: #f7fbff;
+          background:
+            radial-gradient(circle at 50% 115%, color-mix(in srgb, var(--mana-accent) 56%, transparent), transparent 62%),
+            linear-gradient(145deg, #354052, #111722 66%);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 0 8px color-mix(in srgb, var(--mana-accent) 24%, transparent);
         }
 
+        .cost-crystal::after {
+          content: '';
+          position: absolute;
+          top: -9px;
+          left: 5px;
+          width: 22px;
+          height: 17px;
+          border: 1px solid rgba(255,255,255,0.13);
+          transform: rotate(35deg);
+        }
+
+        .cost-crystal svg {
+          width: 11px;
+          height: 11px;
+          color: var(--mana-soft);
+          filter: drop-shadow(0 0 4px var(--mana-accent));
+        }
+
+        .cost-crystal strong {
+          font-size: 1rem;
+          line-height: 1;
+          text-shadow: 0 1px 3px #000;
+        }
+
+        .cost-crystal small {
+          grid-column: 1 / -1;
+          color: rgba(225, 240, 248, 0.64);
+          font: 800 0.38rem/1 var(--font-sans);
+          text-align: center;
+          letter-spacing: 0.08em;
+        }
+
+        .cost-requirements {
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 2px;
+        }
+
+        .generic-cost,
         .faction-cost {
           display: flex;
           align-items: center;
+          justify-content: center;
+          gap: 1px;
+          min-width: 25px;
+          height: 16px;
+          padding: 0 3px;
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 3px 6px 6px 3px;
+          background: color-mix(in srgb, var(--segment-accent) 23%, #10141d);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.16);
+          font-size: 0.58rem;
+          font-weight: 900;
+        }
+
+        .generic-cost {
+          color: #dbe8f0;
+          background: linear-gradient(145deg, #2d3747, #141a24);
+        }
+
+        .generic-rune {
+          color: #91a6b5;
+          font: 900 0.54rem/1 var(--font-sans);
+        }
+
+        .faction-rune {
+          display: grid;
+          width: 11px;
+          height: 11px;
+          place-items: center;
+          border: 1px solid color-mix(in srgb, var(--segment-accent) 72%, white);
+          border-radius: 50%;
+          font-size: 0.42rem;
+          line-height: 1;
+          text-shadow: 0 0 5px currentColor;
+        }
+
+        .card-availability {
+          position: absolute;
+          top: 53px;
+          right: 8px;
+          z-index: 22;
+          display: flex;
+          max-width: calc(100% - 16px);
+          height: 20px;
+          align-items: center;
+          gap: 4px;
+          padding: 0 6px;
+          overflow: hidden;
+          border: 1px solid rgba(255,255,255,0.16);
+          border-radius: 5px;
+          color: #eef8fb;
+          background: rgba(8,14,20,0.9);
+          box-shadow: 0 3px 8px rgba(0,0,0,0.55);
+          font: 800 0.48rem/1 var(--font-sans);
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          pointer-events: none;
+        }
+
+        .card-availability svg {
+          width: 10px;
+          height: 10px;
+          flex: 0 0 auto;
+        }
+
+        .card-availability span {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .card-availability.ready {
+          border-color: rgba(80, 235, 173, 0.5);
+          color: #caffea;
+          background: rgba(5, 72, 51, 0.92);
+          box-shadow: 0 0 10px rgba(46,218,157,0.26), 0 3px 8px rgba(0,0,0,0.55);
+        }
+
+        .card-availability.blocked {
+          border-color: rgba(255, 112, 91, 0.42);
+          color: #ffd6cf;
+          background: rgba(83, 22, 19, 0.92);
+        }
+
+        .card-availability.waiting {
+          color: #b8c6cf;
+          background: rgba(25, 33, 42, 0.92);
+        }
+
+        .mode-hand.availability-blocked .card-cost-badge {
+          filter: saturate(0.58) brightness(0.76);
+          border-color: rgba(255, 112, 91, 0.4);
+          box-shadow: 0 0 9px rgba(255, 84, 61, 0.22), 0 5px 10px rgba(0,0,0,0.72);
+        }
+
+        .mode-hand.availability-ready .card-cost-badge {
+          box-shadow: 0 0 13px color-mix(in srgb, var(--mana-accent) 52%, transparent), 0 5px 10px rgba(0,0,0,0.72), inset 0 1px 0 rgba(255,255,255,0.22);
         }
 
         /* Card Header - Metallic Nameplate */
         .card-header {
-          padding: 7px 12px;
+          min-height: 42px;
+          padding: 7px 78px 7px 12px;
           margin: 6px 8px 0 8px;
           display: flex;
           flex-direction: column;
@@ -315,9 +573,12 @@ export const CardDOM: React.FC<CardDOMProps> = ({
           font-family: var(--font-display);
           font-size: 0.95rem;
           font-weight: 800;
-          white-space: nowrap;
+          display: -webkit-box;
+          line-height: 1.08;
+          white-space: normal;
           overflow: hidden;
-          text-overflow: ellipsis;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 2;
           color: #fff;
           text-shadow: 0 1px 3px rgba(0,0,0,0.9);
         }
@@ -375,7 +636,7 @@ export const CardDOM: React.FC<CardDOMProps> = ({
         }
 
         .card-body.has-stats {
-          padding-bottom: 28px; /* Safe space to prevent overlapping statistics circles! */
+          padding-bottom: 47px;
         }
 
         /* Subtle Watermark */
@@ -451,9 +712,9 @@ export const CardDOM: React.FC<CardDOMProps> = ({
         /* ═══ COMBAT STAT MEDALS (MTG Style Corner overlap) ═══ */
         .card-stats {
           position: absolute;
-          bottom: 3px;
-          left: 3px;
-          right: 3px;
+          bottom: 4px;
+          left: 4px;
+          right: 4px;
           display: flex;
           justify-content: space-between;
           z-index: 20;
@@ -461,45 +722,106 @@ export const CardDOM: React.FC<CardDOMProps> = ({
         }
 
         .stat-badge {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
+          width: 52px;
+          height: 42px;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 0.92rem;
-          font-weight: 900;
-          font-family: var(--font-display);
-          border: 2px solid;
+          gap: 4px;
+          padding: 3px 5px;
+          border: 1.5px solid;
           position: relative;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.7);
+          overflow: hidden;
+          box-shadow: 0 6px 13px rgba(0,0,0,0.78), inset 0 1px 0 rgba(255,255,255,0.22);
+          box-sizing: border-box;
+        }
+
+        .stat-badge::after {
+          content: '';
+          position: absolute;
+          top: -18px;
+          left: 4px;
+          width: 34px;
+          height: 28px;
+          border: 1px solid rgba(255,255,255,0.11);
+          transform: rotate(28deg);
         }
 
         .badge-ring {
           position: absolute;
-          inset: 1px;
-          border: 1px dashed rgba(255,255,255,0.25);
-          border-radius: 50%;
+          inset: 2px;
+          border: 1px solid rgba(255,255,255,0.12);
+          border-radius: inherit;
           pointer-events: none;
         }
 
-        .stat-val {
+        .stat-icon-well {
           z-index: 1;
+          display: grid;
+          width: 19px;
+          height: 24px;
+          place-items: center;
+          border-right: 1px solid rgba(255,255,255,0.14);
+        }
+
+        .stat-icon {
+          width: 15px;
+          height: 15px;
+          flex: 0 0 auto;
+          filter: drop-shadow(0 1px 2px rgba(0,0,0,0.75));
+        }
+
+        .stat-copy {
+          z-index: 1;
+          display: grid;
+          grid-template-columns: auto auto;
+          grid-template-rows: 1fr 9px;
+          min-width: 20px;
+          align-items: end;
+          justify-content: center;
+        }
+
+        .stat-val {
+          font: 900 1.08rem/1 var(--font-display);
           text-shadow: 0 1px 2px rgba(0,0,0,0.8);
         }
 
+        .stat-max {
+          padding-bottom: 1px;
+          color: rgba(255,255,255,0.7);
+          font: 800 0.55rem/1 var(--font-sans);
+        }
+
+        .stat-caption {
+          grid-column: 1 / -1;
+          color: rgba(255,255,255,0.64);
+          font: 800 0.38rem/1 var(--font-sans);
+          text-align: center;
+          letter-spacing: 0.08em;
+        }
+
         .stat-attack-badge {
-          background: radial-gradient(circle at 35% 30%, #991b1b, #450a0a);
-          color: #fecaca;
-          border-color: #ef4444;
-          box-shadow: 0 0 10px rgba(239, 68, 68, 0.35), 0 4px 10px rgba(0,0,0,0.7);
+          border-radius: 7px 15px 7px 15px;
+          background: linear-gradient(145deg, #b52b2b 0%, #651515 48%, #260707 100%);
+          color: #fff2ed;
+          border-color: #ff6b4a;
+          box-shadow: 0 0 12px rgba(255, 74, 50, 0.46), 0 5px 12px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,226,214,0.24);
         }
 
         .stat-health-badge {
-          background: radial-gradient(circle at 35% 30%, #065f46, #022c22);
-          color: #a7f3d0;
-          border-color: #10b981;
-          box-shadow: 0 0 10px rgba(16, 185, 129, 0.35), 0 4px 10px rgba(0,0,0,0.7);
+          margin-left: auto;
+          border-radius: 14px 14px 9px 9px;
+          background: linear-gradient(145deg, #16865f 0%, #07523e 48%, #02251d 100%);
+          color: #eafff6;
+          border-color: #42e2aa;
+          box-shadow: 0 0 12px rgba(46, 218, 157, 0.42), 0 5px 12px rgba(0,0,0,0.75), inset 0 1px 0 rgba(215,255,239,0.24);
+        }
+
+        .stat-health-badge.is-damaged {
+          color: #fff1d6;
+          border-color: #ffb14f;
+          background: linear-gradient(145deg, #8a4b16 0%, #51300f 48%, #251305 100%);
+          box-shadow: 0 0 13px rgba(255, 154, 55, 0.52), 0 5px 12px rgba(0,0,0,0.75);
         }
 
         .card-footer-number {
@@ -523,6 +845,32 @@ export const CardDOM: React.FC<CardDOMProps> = ({
         
         .mode-hand .card-title {
           font-size: 0.8rem;
+        }
+
+        .mode-hand .card-header {
+          min-height: 40px;
+          padding: 7px 76px 6px 10px;
+          margin-left: 7px;
+          margin-right: 7px;
+        }
+
+        .mode-hand .card-cost-badge {
+          top: 6px;
+          right: 6px;
+        }
+
+        .mode-hand .stat-badge {
+          width: 52px;
+          height: 42px;
+        }
+
+        .mode-hand .card-rules {
+          display: -webkit-box;
+          overflow: hidden;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 3;
+          color: #dce9ef;
+          line-height: 1.3;
         }
 
         .mode-hand:hover {
@@ -565,6 +913,7 @@ export const CardDOM: React.FC<CardDOMProps> = ({
         }
         
         .mode-thumbnail .card-header {
+          min-height: 0;
           border: none;
           padding: 0;
           flex: 1;
@@ -572,7 +921,10 @@ export const CardDOM: React.FC<CardDOMProps> = ({
         }
         
         .mode-thumbnail .card-title {
+          display: block;
           font-size: 0.75rem;
+          white-space: nowrap;
+          text-overflow: ellipsis;
         }
 
         .mode-thumbnail .card-border-inlay {
@@ -634,8 +986,11 @@ export const CardDOM: React.FC<CardDOMProps> = ({
           transform: none;
         }
         .mode-deck-preview .card-title {
+          display: block;
           font-size: 0.8rem;
           flex: 1;
+          white-space: nowrap;
+          text-overflow: ellipsis;
         }
         .mode-deck-preview .card-cost-badge {
           position: static;
@@ -643,6 +998,88 @@ export const CardDOM: React.FC<CardDOMProps> = ({
           padding: 0;
           box-shadow: none;
           border: none;
+        }
+
+        @media (max-width: 700px) {
+          .mode-hand .card-header {
+            padding-right: 70px;
+          }
+
+          .mode-hand .card-title {
+            min-height: 28px;
+            max-height: 28px;
+            font-size: 0.72rem;
+          }
+
+          .mode-hand .card-type-label {
+            display: none;
+          }
+
+          .mode-hand .card-cost-badge {
+            height: 36px;
+            padding: 2px;
+            gap: 2px;
+          }
+
+          .mode-hand .cost-crystal {
+            min-width: 32px;
+            padding-inline: 3px;
+          }
+
+          .mode-hand .cost-crystal strong {
+            font-size: 0.86rem;
+          }
+
+          .mode-hand .generic-cost,
+          .mode-hand .faction-cost {
+            min-width: 19px;
+            height: 14px;
+            padding-right: 2px;
+            padding-left: 2px;
+          }
+
+          .mode-hand .faction-rune {
+            width: 10px;
+            height: 10px;
+            font-size: 0.4rem;
+          }
+
+          .mode-hand .stat-badge {
+            width: 43px;
+            height: 36px;
+            gap: 2px;
+            padding: 2px 3px;
+          }
+
+          .mode-hand .stat-caption {
+            display: none;
+          }
+
+          .mode-hand .stat-copy {
+            grid-template-rows: 1fr;
+          }
+
+          .mode-hand .stat-icon {
+            width: 11px;
+            height: 11px;
+          }
+
+          .mode-hand .stat-icon-well {
+            width: 15px;
+            height: 20px;
+          }
+
+          .mode-hand .stat-val {
+            font-size: 0.9rem;
+          }
+
+          .mode-hand .card-availability {
+            top: 49px;
+            right: 7px;
+            height: 18px;
+            padding: 0 4px;
+            font-size: 0.42rem;
+          }
         }
         .mode-deck-preview .card-border-inlay {
           display: none;

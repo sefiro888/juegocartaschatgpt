@@ -1,32 +1,69 @@
 import type { GameState, Position, BoardEntity } from '../types/card';
-import { canAfford, playManaCard, summonUnit, moveUnit, combatAttack, playSpell, endTurn, isAdjacent, getDistance } from './engine';
+import { canAfford, canAffordCard, canAttackTarget, playManaCard, summonUnit, moveUnit, combatAttack, playSpell, endTurn, isAdjacent, getDistance, getMovementAllowance } from './engine';
 import { CARDS_DB } from './cardsDb';
-import { BOARD_SIZE, COMMANDER_COLUMN, OPPONENT_BACK_ROW, PLAYER_BACK_ROW, isInsideBoard } from './boardConfig';
+import { BOARD_SIZE, COMMANDER_COLUMN, OPPONENT_BACK_ROW, PLAYER_BACK_ROW } from './boardConfig';
+import { getReachablePositions, isBoardObstacle } from './boardPathfinding';
+import { cardHasKeyword } from './cardKeywords';
+import {
+  BOUNCE_SPELL_IDS,
+  DIRECT_DAMAGE_SPELL_IDS,
+  FREEZE_SPELL_IDS,
+  FRIENDLY_BUFF_SPELL_IDS,
+  GLOBAL_DAMAGE_SPELL_IDS,
+  getDirectDamageSpellDefinition,
+  getFreezeSpellDefinition,
+} from './spellEffectsCatalog';
+
+export type AIActionKind = 'mana' | 'summon' | 'spell' | 'attack' | 'move';
+
+export interface AIActionStep {
+  state: GameState;
+  kind: AIActionKind;
+  cardId?: string;
+  actorId?: string;
+  targetId?: string;
+  from?: Position;
+  to?: Position;
+}
+
+export type AIActionObserver = (step: AIActionStep) => void;
+
+function reportAIAction(
+  observer: AIActionObserver | undefined,
+  state: GameState,
+  action: Omit<AIActionStep, 'state'>,
+) {
+  observer?.({ ...action, state });
+}
 
 // Spell IDs that target a single enemy
-const ENEMY_TARGET_SPELLS = new Set([
-  'lluvia-ceniza', 'chispa-fugaz', 'prision-glacial',
-  'cometa-arcano', 'destello-runico', 'congelacion-rapida',
+const ENEMY_TARGET_SPELLS = new Set<string>([
+  ...DIRECT_DAMAGE_SPELL_IDS,
+  ...FREEZE_SPELL_IDS.filter(
+    (cardId) => getFreezeSpellDefinition(cardId)?.targetMode === 'single-entity',
+  ),
 ]);
 
 // Buff spells that target a friendly unit
-const FRIENDLY_TARGET_SPELLS = new Set([
-  'impetu-fuego', 'furia-nexo',
+const FRIENDLY_TARGET_SPELLS = new Set<string>([
+  ...FRIENDLY_BUFF_SPELL_IDS,
 ]);
 
 // Spells that target a column (any position in the column)
-const COLUMN_TARGET_SPELLS = new Set([
-  'tormenta-mana',
-]);
+const COLUMN_TARGET_SPELLS = new Set<string>(
+  FREEZE_SPELL_IDS.filter(
+    (cardId) => getFreezeSpellDefinition(cardId)?.targetMode === 'column',
+  ),
+);
 
 // AoE spells that need no target
-const NO_TARGET_SPELLS = new Set([
-  'erupcion-volcanica',
+const NO_TARGET_SPELLS = new Set<string>([
+  ...GLOBAL_DAMAGE_SPELL_IDS,
 ]);
 
 // Vortice de Maná targets an enemy unit to bounce
-const BOUNCE_SPELLS = new Set([
-  'vortice-mana',
+const BOUNCE_SPELLS = new Set<string>([
+  ...BOUNCE_SPELL_IDS,
 ]);
 
 // Find the player commander entity on the board
@@ -45,7 +82,7 @@ function scoreAttackTarget(target: BoardEntity): number {
 }
 
 // Simple heuristic AI for OPPONENT
-export function executeAITurn(state: GameState): GameState {
+export function executeAITurn(state: GameState, observer?: AIActionObserver): GameState {
   let currentState = { ...state };
   let actionCount = 0;
   const maxActions = 20; // Loop protection
@@ -55,6 +92,7 @@ export function executeAITurn(state: GameState): GameState {
   const manaCard = opponent.hand.find(c => c.type === 'MANA');
   if (manaCard && !opponent.manaPlayedThisTurn) {
     currentState = playManaCard(currentState, 'OPPONENT', manaCard.id);
+    reportAIAction(observer, currentState, { kind: 'mana', cardId: manaCard.id });
     actionCount++;
   }
 
@@ -81,7 +119,7 @@ export function executeAITurn(state: GameState): GameState {
             const isBackrow = y === OPPONENT_BACK_ROW;
             let adjacentAlly = false;
             for (const ent of Object.values(currentState.board)) {
-              if (ent.controller === 'OPPONENT' && isAdjacent(ent.position, pos, false)) {
+              if (!isBoardObstacle(ent) && ent.controller === 'OPPONENT' && isAdjacent(ent.position, pos, false)) {
                 adjacentAlly = true;
                 break;
               }
@@ -116,6 +154,7 @@ export function executeAITurn(state: GameState): GameState {
           if (card.id === 'tejedora-tiempo') {
             const friendlyActed = Object.values(currentState.board).filter(
               ent => ent.controller === 'OPPONENT' &&
+                !isBoardObstacle(ent) &&
                 (ent.hasMovedThisTurn || ent.hasAttackedThisTurn) &&
                 CARDS_DB[ent.cardId]?.type !== 'ESTRUCTURA'
             );
@@ -128,6 +167,11 @@ export function executeAITurn(state: GameState): GameState {
 
           const bestSpot = validSpots[0];
           currentState = summonUnit(currentState, 'OPPONENT', card.id, bestSpot, battlecryTarget);
+          reportAIAction(observer, currentState, {
+            kind: 'summon',
+            cardId: card.id,
+            to: { ...bestSpot },
+          });
           summoned = true;
           actionCount++;
           possibleMoves = true;
@@ -143,7 +187,7 @@ export function executeAITurn(state: GameState): GameState {
     let spellCast = false;
 
     for (const card of handSpells) {
-      if (!canAfford(currentState.opponent, card)) continue;
+      if (!canAffordCard(currentState, 'OPPONENT', card)) continue;
 
       // --- AoE spells (no target needed) ---
       if (NO_TARGET_SPELLS.has(card.id)) {
@@ -152,10 +196,11 @@ export function executeAITurn(state: GameState): GameState {
           ent => ent.controller === 'PLAYER' && ent.id !== 'commander-player'
         );
         const opponentUnits = Object.values(currentState.board).filter(
-          ent => ent.controller === 'OPPONENT' && ent.id !== 'commander-opponent'
+          ent => ent.controller === 'OPPONENT' && ent.id !== 'commander-opponent' && !isBoardObstacle(ent)
         );
         if (playerUnits.length > opponentUnits.length) {
           currentState = playSpell(currentState, 'OPPONENT', card.id);
+          reportAIAction(observer, currentState, { kind: 'spell', cardId: card.id });
           spellCast = true;
           actionCount++;
           possibleMoves = true;
@@ -168,6 +213,7 @@ export function executeAITurn(state: GameState): GameState {
       if (FRIENDLY_TARGET_SPELLS.has(card.id)) {
         const friendlyUnits = Object.values(currentState.board).filter(
           ent => ent.controller === 'OPPONENT' &&
+            !isBoardObstacle(ent) &&
             CARDS_DB[ent.cardId]?.type !== 'ESTRUCTURA' &&
             ent.id !== 'commander-opponent'
         );
@@ -184,6 +230,12 @@ export function executeAITurn(state: GameState): GameState {
           });
           const bestTarget = friendlyUnits[0];
           currentState = playSpell(currentState, 'OPPONENT', card.id, bestTarget.position);
+          reportAIAction(observer, currentState, {
+            kind: 'spell',
+            cardId: card.id,
+            targetId: bestTarget.id,
+            to: { ...bestTarget.position },
+          });
           spellCast = true;
           actionCount++;
           possibleMoves = true;
@@ -211,7 +263,13 @@ export function executeAITurn(state: GameState): GameState {
           }
         }
         if (bestCol >= 0 && bestCount >= 2) {
-              currentState = playSpell(currentState, 'OPPONENT', card.id, { x: bestCol, y: PLAYER_BACK_ROW });
+          const columnTarget = { x: bestCol, y: PLAYER_BACK_ROW };
+          currentState = playSpell(currentState, 'OPPONENT', card.id, columnTarget);
+          reportAIAction(observer, currentState, {
+            kind: 'spell',
+            cardId: card.id,
+            to: columnTarget,
+          });
           spellCast = true;
           actionCount++;
           possibleMoves = true;
@@ -231,6 +289,12 @@ export function executeAITurn(state: GameState): GameState {
           // Bounce the strongest enemy unit
           playerUnits.sort((a, b) => b.attack - a.attack);
           currentState = playSpell(currentState, 'OPPONENT', card.id, playerUnits[0].position);
+          reportAIAction(observer, currentState, {
+            kind: 'spell',
+            cardId: card.id,
+            targetId: playerUnits[0].id,
+            to: { ...playerUnits[0].position },
+          });
           spellCast = true;
           actionCount++;
           possibleMoves = true;
@@ -249,10 +313,7 @@ export function executeAITurn(state: GameState): GameState {
           const commander = playerEntities.find(ent => ent.id === 'commander-player');
 
           // For damage spells, calculate expected damage
-          let spellDamage = 0;
-          if (card.id === 'lluvia-ceniza') spellDamage = 3;
-          if (card.id === 'chispa-fugaz') spellDamage = 2;
-          if (card.id === 'cometa-arcano') spellDamage = 4;
+          const spellDamage = getDirectDamageSpellDefinition(card.id)?.damage ?? 0;
 
           let target: BoardEntity | undefined;
 
@@ -281,8 +342,8 @@ export function executeAITurn(state: GameState): GameState {
           }
 
           if (target) {
-            // Special check for destello-runico: target must be adjacent to opponent's commander
-            if (card.id === 'destello-runico') {
+            // Some freeze spells require a target adjacent to the caster's commander.
+            if (getFreezeSpellDefinition(card.id)?.requiresAdjacentCommander) {
               const oppCmd = findCommander(currentState, 'OPPONENT');
               if (!oppCmd || !isAdjacent(oppCmd.position, target.position, false)) {
                 continue; // Skip this spell
@@ -291,11 +352,17 @@ export function executeAITurn(state: GameState): GameState {
 
             // Check spell immunity
             const targetCard = CARDS_DB[target.cardId];
-            if (targetCard && targetCard.rulesText.includes('Inmune a Hechizos')) {
+            if (cardHasKeyword(targetCard, 'spell-immunity')) {
               continue;
             }
 
             currentState = playSpell(currentState, 'OPPONENT', card.id, target.position);
+            reportAIAction(observer, currentState, {
+              kind: 'spell',
+              cardId: card.id,
+              targetId: target.id,
+              to: { ...target.position },
+            });
             spellCast = true;
             actionCount++;
             possibleMoves = true;
@@ -311,6 +378,7 @@ export function executeAITurn(state: GameState): GameState {
     // --- ATTACK PHASE: prioritize attacks before movement ---
     const attackableUnits = Object.values(currentState.board).filter(
       ent => ent.controller === 'OPPONENT' &&
+        !isBoardObstacle(ent) &&
         !ent.hasAttackedThisTurn &&
         ent.frozenTurns === 0 &&
         CARDS_DB[ent.cardId]?.type !== 'ESTRUCTURA'
@@ -319,10 +387,8 @@ export function executeAITurn(state: GameState): GameState {
     let unitActed = false;
 
     for (const unit of attackableUnits) {
-      const cardRef = CARDS_DB[unit.cardId];
-      const diagonal = cardRef?.rulesText.includes('Movimiento Diagonal') || false;
       const adjacentEnemies = Object.values(currentState.board).filter(
-        ent => ent.controller === 'PLAYER' && isAdjacent(unit.position, ent.position, diagonal)
+        ent => ent.controller === 'PLAYER' && canAttackTarget(currentState, unit.position, ent.position)
       );
 
       if (adjacentEnemies.length > 0) {
@@ -330,7 +396,17 @@ export function executeAITurn(state: GameState): GameState {
         adjacentEnemies.sort((a, b) => scoreAttackTarget(b) - scoreAttackTarget(a));
         const bestTarget = adjacentEnemies[0];
 
-        currentState = combatAttack(currentState, unit.position, bestTarget.position);
+        const attackFrom = { ...unit.position };
+        const attackTo = { ...bestTarget.position };
+        currentState = combatAttack(currentState, attackFrom, attackTo);
+        reportAIAction(observer, currentState, {
+          kind: 'attack',
+          cardId: unit.cardId,
+          actorId: unit.id,
+          targetId: bestTarget.id,
+          from: attackFrom,
+          to: attackTo,
+        });
         unitActed = true;
         actionCount++;
         possibleMoves = true;
@@ -343,6 +419,7 @@ export function executeAITurn(state: GameState): GameState {
     // --- MOVEMENT PHASE: move remaining unmoved units toward enemy commander ---
     const movableUnits = Object.values(currentState.board).filter(
       ent => ent.controller === 'OPPONENT' &&
+        !isBoardObstacle(ent) &&
         !ent.hasMovedThisTurn &&
         ent.frozenTurns === 0 &&
         CARDS_DB[ent.cardId]?.type !== 'ESTRUCTURA'
@@ -355,42 +432,17 @@ export function executeAITurn(state: GameState): GameState {
       const playerCmd = findCommander(currentState, 'PLAYER');
       const targetPos = playerCmd ? playerCmd.position : { x: COMMANDER_COLUMN, y: PLAYER_BACK_ROW };
 
-      // Collect possible movement destinations
-      const directions: Position[] = [];
       const cardRef = CARDS_DB[unit.cardId];
-      const orthogonal = [
-        { x: currentPos.x, y: currentPos.y - 1 },
-        { x: currentPos.x - 1, y: currentPos.y },
-        { x: currentPos.x + 1, y: currentPos.y },
-        { x: currentPos.x, y: currentPos.y + 1 },
-      ];
-
-      for (const d of orthogonal) {
-        if (isInsideBoard(d.x, d.y)) {
-          directions.push(d);
-        }
-      }
-
-      // Diagonal movement support for volcanic infiltrator
-      if (cardRef?.rulesText.includes('Movimiento Diagonal')) {
-        const diags = [
-          { x: currentPos.x - 1, y: currentPos.y - 1 },
-          { x: currentPos.x + 1, y: currentPos.y - 1 },
-          { x: currentPos.x - 1, y: currentPos.y + 1 },
-          { x: currentPos.x + 1, y: currentPos.y + 1 },
-        ];
-        for (const d of diags) {
-          if (isInsideBoard(d.x, d.y)) {
-            directions.push(d);
-          }
-        }
-      }
-
-      // Filter to empty tiles
-      const possibleCoords = directions.filter(p => {
-        const key = `${p.x},${p.y}`;
-        return !currentState.board[key];
-      });
+      if (!cardRef) continue;
+      const possibleCoords = getReachablePositions(
+        currentState.board,
+        currentPos,
+        getMovementAllowance(currentState, unit),
+        {
+          allowDiagonal: true,
+          canFly: cardHasKeyword(cardRef, 'flying'),
+        },
+      ).map((candidate) => candidate.position);
 
       if (possibleCoords.length > 0) {
         // Sort by distance to player commander (prefer moving toward it)
@@ -405,7 +457,16 @@ export function executeAITurn(state: GameState): GameState {
         const currentDist = getDistance(currentPos, targetPos);
         const newDist = getDistance(bestMove, targetPos);
         if (newDist < currentDist) {
-          currentState = moveUnit(currentState, currentPos, bestMove);
+          const moveFrom = { ...currentPos };
+          const moveTo = { ...bestMove };
+          currentState = moveUnit(currentState, moveFrom, moveTo);
+          reportAIAction(observer, currentState, {
+            kind: 'move',
+            cardId: unit.cardId,
+            actorId: unit.id,
+            from: moveFrom,
+            to: moveTo,
+          });
           moved = true;
           actionCount++;
           possibleMoves = true;

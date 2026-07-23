@@ -1,4 +1,6 @@
-import type { Card } from '../types/card';
+import type { Card, Faction, ManaType } from '../types/card';
+import type { DeckId } from './deckCatalog';
+import { MANA_SOURCE_CARD_IDS, MANA_TYPES, factionToManaType } from './factionRules';
 
 export const CARDS_DB: Record<string, Card> = {
   // --- FURIA (20 cartas, IDs 1-12, 25-32) ---
@@ -13,7 +15,7 @@ export const CARDS_DB: Record<string, Card> = {
     rulesText: 'Genera 1 de maná de Furia. (Límite de 1 maná jugado por turno)',
     flavorText: '«El latido ígneo de la tierra misma no se puede apagar; fluye silencioso bajo el nexo esperando la chispa que lo libere.» — Leyenda del Cataclismo',
     cardNumber: 1,
-    artPath: '/assets/cards/art/fuente-furia.png',
+    artPath: '/assets/cards/art/fuente-furia.webp',
     range: 1,
     movement: 0,
     artist: 'Ignis Fatuus',
@@ -27,6 +29,7 @@ export const CARDS_DB: Record<string, Card> = {
     subtype: 'Bestia',
     cost: { generic: 1, furia: 1 },
     rarity: 'COMUN',
+    keywords: ['charge'],
     rulesText: 'Carga (Puede moverse y atacar inmediatamente al ser invocado).',
     flavorText: 'El sabueso olfateó el aire cargado de azufre, soltando un ladrido que encendió la hojarasca a su paso. «No es solo una bestia, es una mecha andante», comentó el explorador.',
     attack: 2,
@@ -65,6 +68,7 @@ export const CARDS_DB: Record<string, Card> = {
     subtype: 'Dragón',
     cost: { generic: 6, furia: 2 },
     rarity: 'LEGENDARIA',
+    keywords: ['flying', 'battlecry'],
     rulesText: 'Vuelo (Puede saltar obstáculos). Grito de Batalla: Inflige 2 de daño a todas las unidades enemigas adyacentes.',
     flavorText: 'Cuando alza el vuelo, el cielo se tiñe de brasa y ceniza. Las leyendas dicen que duerme en el corazón del volcán nexo y despierta solo para reclamar su tributo de fuego.',
     attack: 6,
@@ -136,6 +140,7 @@ export const CARDS_DB: Record<string, Card> = {
     subtype: 'Pícaro',
     cost: { generic: 2, furia: 1 },
     rarity: 'COMUN',
+    keywords: ['diagonal'],
     rulesText: 'Movimiento Diagonal: Puede desplazarse y atacar diagonalmente.',
     flavorText: 'Se desplaza silencioso por los ríos de magma ardiente. Su silueta se confunde con las sombras de las rocas ígneas antes de asestar el golpe letal.',
     attack: 2,
@@ -380,7 +385,7 @@ export const CARDS_DB: Record<string, Card> = {
     rulesText: 'Genera 1 de maná de Arcano. (Límite de 1 maná jugado por turno)',
     flavorText: '«La corriente fría de la energía pura y silenciosa que sostiene el Domo. Es el fluir del cosmos que pacifica el alma.» — Aethelgard',
     cardNumber: 13,
-    artPath: '/assets/cards/art/fuente-arcana.png',
+    artPath: '/assets/cards/art/fuente-arcana.webp',
     range: 1,
     movement: 0,
     artist: 'Lyra Frost',
@@ -394,6 +399,7 @@ export const CARDS_DB: Record<string, Card> = {
     subtype: 'Golem',
     cost: { generic: 2, arcano: 1 },
     rarity: 'COMUN',
+    keywords: ['resistance'],
     rulesText: 'Resistencia: Ignora el primer punto de daño que recibe en cada turno.',
     flavorText: 'Piedra rúnica tallada en cristal que repele los impactos. Sus runas brillan con luz azul fría con cada golpe absorbido.',
     attack: 1,
@@ -489,7 +495,7 @@ export const CARDS_DB: Record<string, Card> = {
     attack: 1,
     maxHealth: 2,
     cardNumber: 19,
-    artPath: '/assets/cards/art/aprendiz-nexo.png',
+    artPath: '/assets/cards/art/aprendiz-nexo.webp',
     range: 1,
     movement: 1,
     artist: 'PixelLord',
@@ -507,7 +513,7 @@ export const CARDS_DB: Record<string, Card> = {
     flavorText: 'Tocarla es quedar atrapado por la escarcha eterna del polo norte. Los atacantes quedan petrificados al instante al tocar el hielo puro.',
     maxHealth: 4,
     cardNumber: 20,
-    artPath: '/assets/cards/art/barrera-hielo.png',
+    artPath: '/assets/cards/art/barrera-hielo.webp',
     range: 1,
     movement: 0,
     artist: 'Brutus Clay',
@@ -524,7 +530,7 @@ export const CARDS_DB: Record<string, Card> = {
     rulesText: 'Congela a una unidad enemiga adyacente a tu Comandante y roba 1 carta.',
     flavorText: '«Un destello cegador que emana del báculo rúnico para aturdir a los agresores más atrevidos.» — Comandante Aethelgard',
     cardNumber: 21,
-    artPath: '/assets/cards/art/destello-runico.png',
+    artPath: '/assets/cards/art/destello-runico.webp',
     range: 2,
     movement: 0,
     artist: 'Aria Star',
@@ -538,6 +544,7 @@ export const CARDS_DB: Record<string, Card> = {
     subtype: 'Golem',
     cost: { generic: 5, arcano: 2 },
     rarity: 'LEGENDARIA',
+    keywords: ['spell-immunity'],
     rulesText: 'Inmune a Hechizos: No puede ser objetivo de hechizos de ningún jugador.',
     flavorText: 'Hielo antiguo modelado con la fuerza silenciosa de los siglos. Las runas arcanas que lo mantienen en pie repelen todo intento de encantamiento.',
     attack: 3,
@@ -560,7 +567,7 @@ export const CARDS_DB: Record<string, Card> = {
     rulesText: 'Devuelve una unidad del tablero a la mano de su propietario.',
     flavorText: '«La energía del Nexo gira en sentido contrario, deshaciendo la materia y enviando la criatura de vuelta al plano de su invocación.» — Libro de hechizos del Domo',
     cardNumber: 23,
-    artPath: '/assets/cards/art/vortice-mana.png',
+    artPath: '/assets/cards/art/vortice-mana.webp',
     range: 3,
     movement: 0,
     artist: 'Hokusai Runic',
@@ -655,7 +662,7 @@ export const CARDS_DB: Record<string, Card> = {
     attack: 2,
     maxHealth: 2,
     cardNumber: 36,
-    artPath: '/assets/cards/art/tejedora-tiempo.png',
+    artPath: '/assets/cards/art/tejedora-tiempo.webp',
     range: 1,
     movement: 1,
     artist: 'Aria Star',
@@ -674,7 +681,7 @@ export const CARDS_DB: Record<string, Card> = {
     attack: 2,
     maxHealth: 3,
     cardNumber: 37,
-    artPath: '/assets/cards/art/mago-runa-helada.png',
+    artPath: '/assets/cards/art/mago-runa-helada.webp',
     range: 2,
     movement: 1,
     artist: 'Hokusai Runic',
@@ -691,7 +698,7 @@ export const CARDS_DB: Record<string, Card> = {
     rulesText: 'Congela a una unidad enemiga en el tablero. Roba 1 carta.',
     flavorText: '«Un suspiro frío en el aire y el objetivo se detiene rígido, mientras sus pensamientos se vuelven transparentes para el invocador.» — Lección del Domo',
     cardNumber: 38,
-    artPath: '/assets/cards/art/congelacion-rapida.svg',
+    artPath: '/assets/cards/art/congelacion-rapida.webp',
     range: 3,
     movement: 0,
     artist: 'PixelLord',
@@ -708,7 +715,7 @@ export const CARDS_DB: Record<string, Card> = {
     rulesText: 'Congela a todas las unidades en la columna seleccionada del tablero.',
     flavorText: 'Una ventisca cósmica que paraliza líneas enteras de infantería enemiga. El frío desciende directamente del Domo, inmovilizando los peones enemigos.',
     cardNumber: 39,
-    artPath: '/assets/cards/art/tormenta-mana.svg',
+    artPath: '/assets/cards/art/tormenta-mana.webp',
     range: 3,
     movement: 0,
     artist: 'Valerius',
@@ -726,11 +733,608 @@ export const CARDS_DB: Record<string, Card> = {
     flavorText: '«El nexo del templo sagrado irradia energía protectora al sabio, convirtiendo su báculo en un arma letal y su túnica en un escudo rúnico.»',
     maxHealth: 4,
     cardNumber: 40,
-    artPath: '/assets/cards/art/templo-runico.svg',
+    artPath: '/assets/cards/art/templo-runico.webp',
     range: 1,
     movement: 0,
     artist: 'Brutus Clay',
     artistStyle: 'Boceto a Carbón / Sketch'
+  },
+  'devorador-entropico': {
+    id: 'devorador-entropico',
+    name: 'Devorador Entrópico',
+    faction: 'VACIO',
+    type: 'UNIDAD',
+    subtype: 'Horror cósmico',
+    cost: { generic: 5, arcano: 2 },
+    rarity: 'LEGENDARIA',
+    rulesText: 'Vuelo (Puede saltar obstáculos). Resistencia (Reduce en 1 el daño recibido).',
+    flavorText: '«No devora mundos por hambre, sino para devolverlos al silencio anterior a la creación.» — Astrónomo del último observatorio',
+    attack: 4,
+    maxHealth: 6,
+    cardNumber: 41,
+    artPath: '/assets/cards/art/devorador-entropico.webp',
+    range: 1,
+    movement: 2,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Fantasía cósmica'
+  },
+  'basilisco-caos': {
+    id: 'basilisco-caos',
+    name: 'Basilisco del Caos',
+    faction: 'NATURALEZA',
+    type: 'UNIDAD',
+    subtype: 'Bestia',
+    cost: { generic: 4 },
+    rarity: 'RARA',
+    rulesText: 'Movimiento Diagonal: Puede desplazarse y atacar diagonalmente.',
+    flavorText: 'Su mirada no convierte la carne en piedra: desordena las leyes que mantienen unido al mundo.',
+    attack: 4,
+    maxHealth: 4,
+    cardNumber: 42,
+    artPath: '/assets/cards/art/basilisco-caos.webp',
+    range: 1,
+    movement: 1,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Fantasía oscura'
+  },
+  'biblioteca-runica': {
+    id: 'biblioteca-runica',
+    name: 'Biblioteca Rúnica',
+    faction: 'ARCANO',
+    type: 'ESTRUCTURA',
+    subtype: 'Edificio',
+    cost: { generic: 3, arcano: 1 },
+    rarity: 'RARA',
+    rulesText: 'Al comienzo de tu turno, roba 1 carta.',
+    flavorText: 'Cada pasillo conserva un futuro posible y cada libro sabe cuánto le queda a una estrella para apagarse.',
+    maxHealth: 5,
+    cardNumber: 43,
+    artPath: '/assets/cards/art/biblioteca-runica.webp',
+    range: 1,
+    movement: 0,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Arquitectura rúnica'
+  },
+  'clerigo-luz': {
+    id: 'clerigo-luz',
+    name: 'Clérigo de la Luz',
+    faction: 'ORDEN',
+    type: 'UNIDAD',
+    subtype: 'Clérigo',
+    cost: { generic: 4 },
+    rarity: 'COMUN',
+    rulesText: 'Resistencia (Reduce en 1 el daño recibido).',
+    flavorText: 'Su plegaria no pide que desaparezca la oscuridad, sino que nadie tenga que atravesarla solo.',
+    attack: 3,
+    maxHealth: 4,
+    cardNumber: 44,
+    artPath: '/assets/cards/art/clerigo-luz.webp',
+    range: 1,
+    movement: 1,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Fantasía sacra'
+  },
+  'demonio-infernal': {
+    id: 'demonio-infernal',
+    name: 'Demonio Infernal',
+    faction: 'SOMBRA',
+    type: 'UNIDAD',
+    subtype: 'Demonio',
+    cost: { generic: 5 },
+    rarity: 'RARA',
+    rulesText: 'Carga (Puede moverse y atacar inmediatamente al ser invocado).',
+    flavorText: 'No fue invocado desde el infierno. El infierno se abrió para que él pudiera salir.',
+    attack: 5,
+    maxHealth: 4,
+    cardNumber: 45,
+    artPath: '/assets/cards/art/demonio-infernal.webp',
+    range: 1,
+    movement: 1,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Pintura infernal'
+  },
+  'espectro-siniestro': {
+    id: 'espectro-siniestro',
+    name: 'Espectro Siniestro',
+    faction: 'SOMBRA',
+    type: 'UNIDAD',
+    subtype: 'Espectro',
+    cost: { generic: 3 },
+    rarity: 'COMUN',
+    rulesText: 'Vuelo (Puede saltar obstáculos).',
+    flavorText: 'La cripta lo recuerda como un nombre; el campo de batalla lo conoce como una silueta que nunca toca el suelo.',
+    attack: 3,
+    maxHealth: 3,
+    cardNumber: 46,
+    artPath: '/assets/cards/art/espectro-siniestro.webp',
+    range: 1,
+    movement: 2,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Gótico espectral'
+  },
+  'esqueleto-guerrero': {
+    id: 'esqueleto-guerrero',
+    name: 'Esqueleto Guerrero',
+    faction: 'SOMBRA',
+    type: 'UNIDAD',
+    subtype: 'Guerrero',
+    cost: { generic: 2 },
+    rarity: 'COMUN',
+    rulesText: 'Resistencia (Reduce en 1 el daño recibido).',
+    flavorText: 'Su armadura se oxidó hace siglos. Su juramento, en cambio, sigue afilado.',
+    attack: 2,
+    maxHealth: 3,
+    cardNumber: 47,
+    artPath: '/assets/cards/art/esqueleto-guerrero.webp',
+    range: 1,
+    movement: 1,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Fantasía gótica'
+  },
+  'gigante-magma': {
+    id: 'gigante-magma',
+    name: 'Gigante de Magma',
+    faction: 'FURIA',
+    type: 'UNIDAD',
+    subtype: 'Gigante',
+    cost: { generic: 5, furia: 1 },
+    rarity: 'EPICA',
+    rulesText: 'Resistencia (Reduce en 1 el daño recibido).',
+    flavorText: 'Cada paso suyo levanta una montaña de ceniza y cada puño recuerda el primer golpe del Cataclismo.',
+    attack: 5,
+    maxHealth: 6,
+    cardNumber: 48,
+    artPath: '/assets/cards/art/gigante-magma.webp',
+    range: 1,
+    movement: 1,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Fantasía volcánica'
+  },
+  'golem-runico': {
+    id: 'golem-runico',
+    name: 'Gólem Rúnico',
+    faction: 'ARCANO',
+    type: 'UNIDAD',
+    subtype: 'Gólem',
+    cost: { generic: 5, arcano: 1 },
+    rarity: 'EPICA',
+    rulesText: 'Resistencia (Reduce en 1 el daño recibido).',
+    flavorText: 'Las runas de su pecho no describen un hechizo: describen una orden que lleva mil años esperando.',
+    attack: 4,
+    maxHealth: 6,
+    cardNumber: 49,
+    artPath: '/assets/cards/art/golem-runico.webp',
+    range: 1,
+    movement: 1,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Piedra rúnica'
+  },
+  'grifo-orden': {
+    id: 'grifo-orden',
+    name: 'Grifo del Orden',
+    faction: 'ORDEN',
+    type: 'UNIDAD',
+    subtype: 'Grifo',
+    cost: { generic: 4 },
+    rarity: 'RARA',
+    rulesText: 'Vuelo (Puede saltar obstáculos).',
+    flavorText: 'Desde sus alas, las fronteras parecen líneas dibujadas sobre la tierra. Su deber es vigilar todas.',
+    attack: 3,
+    maxHealth: 4,
+    cardNumber: 50,
+    artPath: '/assets/cards/art/grifo-orden.webp',
+    range: 1,
+    movement: 2,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Fantasía celestial'
+  },
+  'guardian-escarchado': {
+    id: 'guardian-escarchado',
+    name: 'Guardián Escarchado',
+    faction: 'ARCANO',
+    type: 'UNIDAD',
+    subtype: 'Guardián',
+    cost: { generic: 4, arcano: 1 },
+    rarity: 'RARA',
+    rulesText: 'Resistencia (Reduce en 1 el daño recibido).',
+    flavorText: 'No protege una puerta ni un tesoro. Protege el último fragmento de invierno que queda en el Nexo.',
+    attack: 3,
+    maxHealth: 5,
+    cardNumber: 51,
+    artPath: '/assets/cards/art/guardian-escarchado.webp',
+    range: 1,
+    movement: 1,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Fantasía glacial'
+  },
+  'juicio-divino': {
+    id: 'juicio-divino',
+    name: 'Juicio Divino',
+    faction: 'ORDEN',
+    type: 'HECHIZO',
+    subtype: 'Castigo',
+    cost: { generic: 4 },
+    rarity: 'EPICA',
+    rulesText: 'Inflige 3 puntos de daño a una unidad seleccionada o al Nexo objetivo.',
+    flavorText: 'Cuando la luz cae desde el cielo, incluso los culpables y los inocentes comparten la misma sombra.',
+    cardNumber: 52,
+    artPath: '/assets/cards/art/juicio-divino.webp',
+    range: 4,
+    movement: 0,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Fantasía divina'
+  },
+  'leviatan-abisal': {
+    id: 'leviatan-abisal',
+    name: 'Leviatán Abisal',
+    faction: 'VACIO',
+    type: 'UNIDAD',
+    subtype: 'Leviatán',
+    cost: { generic: 6 },
+    rarity: 'LEGENDARIA',
+    rulesText: 'Vuelo (Puede saltar obstáculos).',
+    flavorText: 'Nada en un océano sin agua y emerge allí donde el cielo empieza a parecerse demasiado a un abismo.',
+    attack: 6,
+    maxHealth: 6,
+    cardNumber: 53,
+    artPath: '/assets/cards/art/leviatan-abisal.webp',
+    range: 1,
+    movement: 2,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Fantasía abisal'
+  },
+  'murcielago-sombra': {
+    id: 'murcielago-sombra',
+    name: 'Murciélago de Sombra',
+    faction: 'SOMBRA',
+    type: 'UNIDAD',
+    subtype: 'Bestia',
+    cost: { generic: 2 },
+    rarity: 'COMUN',
+    rulesText: 'Vuelo (Puede saltar obstáculos).',
+    flavorText: 'Su chillido no se escucha: aparece dentro de la mente de quien ya ha sido elegido como presa.',
+    attack: 2,
+    maxHealth: 2,
+    cardNumber: 54,
+    artPath: '/assets/cards/art/murcielago-sombra.webp',
+    range: 1,
+    movement: 2,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Gótico sombrío'
+  },
+  'orco-comandante': {
+    id: 'orco-comandante',
+    name: 'Comandante Orco',
+    faction: 'FURIA',
+    type: 'UNIDAD',
+    subtype: 'Guerrero',
+    cost: { generic: 5, furia: 1 },
+    rarity: 'EPICA',
+    rulesText: 'Carga (Puede moverse y atacar inmediatamente al ser invocado).',
+    flavorText: 'No grita para ordenar el ataque. Grita porque ya está en medio de él.',
+    attack: 5,
+    maxHealth: 5,
+    cardNumber: 55,
+    artPath: '/assets/cards/art/cacique-orco.png',
+    range: 1,
+    movement: 1,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Guerra de fantasía'
+  },
+  'orco-guerrero': {
+    id: 'orco-guerrero',
+    name: 'Guerrero Orco',
+    faction: 'FURIA',
+    type: 'UNIDAD',
+    subtype: 'Guerrero',
+    cost: { generic: 3, furia: 1 },
+    rarity: 'COMUN',
+    rulesText: 'Carga (Puede moverse y atacar inmediatamente al ser invocado).',
+    flavorText: 'El acero es pesado, la armadura es incómoda y el enemigo está cerca. Para él, todo eso es una invitación.',
+    attack: 3,
+    maxHealth: 3,
+    cardNumber: 56,
+    artPath: '/assets/cards/art/orco-guerrero.webp',
+    range: 1,
+    movement: 1,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Guerra de fantasía'
+  },
+  'parasito-vacio': {
+    id: 'parasito-vacio',
+    name: 'Parásito del Vacío',
+    faction: 'VACIO',
+    type: 'UNIDAD',
+    subtype: 'Horror',
+    cost: { generic: 3 },
+    rarity: 'COMUN',
+    rulesText: 'Movimiento Diagonal: Puede desplazarse y atacar diagonalmente.',
+    flavorText: 'No invade un cuerpo: convence a la realidad de que siempre hubo algo viviendo dentro.',
+    attack: 3,
+    maxHealth: 3,
+    cardNumber: 57,
+    artPath: '/assets/cards/art/parasito-vacio.webp',
+    range: 1,
+    movement: 1,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Horror cósmico'
+  },
+  'pegaso-celestial': {
+    id: 'pegaso-celestial',
+    name: 'Pegaso Celestial',
+    faction: 'ORDEN',
+    type: 'UNIDAD',
+    subtype: 'Pegaso',
+    cost: { generic: 4 },
+    rarity: 'RARA',
+    rulesText: 'Vuelo (Puede saltar obstáculos).',
+    flavorText: 'Sus cascos no pisan las nubes: las despiertan. Allí donde galopa, el amanecer encuentra un camino.',
+    attack: 3,
+    maxHealth: 4,
+    cardNumber: 58,
+    artPath: '/assets/cards/art/pegaso-celestial.webp',
+    range: 1,
+    movement: 2,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Fantasía celestial'
+  },
+  'pesadilla-mortal': {
+    id: 'pesadilla-mortal',
+    name: 'Pesadilla Mortal',
+    faction: 'SOMBRA',
+    type: 'HECHIZO',
+    subtype: 'Miedo',
+    cost: { generic: 4 },
+    rarity: 'RARA',
+    rulesText: 'Inflige 3 puntos de daño a una unidad seleccionada o al Nexo objetivo.',
+    flavorText: 'El objetivo no ve una criatura: ve el instante exacto en que todos sus planes dejan de importar.',
+    cardNumber: 59,
+    artPath: '/assets/cards/art/pesadilla-mortal.webp',
+    range: 4,
+    movement: 0,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Fantasía onírica'
+  },
+  'zombi-hambriento': {
+    id: 'zombi-hambriento',
+    name: 'Zombi Hambriento',
+    faction: 'SOMBRA',
+    type: 'UNIDAD',
+    subtype: 'No-muerto',
+    cost: { generic: 2 },
+    rarity: 'COMUN',
+    rulesText: 'Resistencia (Reduce en 1 el daño recibido).',
+    flavorText: 'La tumba le quitó el nombre, pero no el hambre. Desde entonces busca un corazón que todavía recuerde cómo latir.',
+    attack: 2,
+    maxHealth: 3,
+    cardNumber: 60,
+    artPath: '/assets/cards/art/zombi-infectado.png',
+    range: 1,
+    movement: 1,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Horror gótico'
+  },
+  'golem-piedra': {
+    id: 'golem-piedra',
+    name: 'Gólem de Piedra',
+    faction: 'ARCANO',
+    type: 'UNIDAD',
+    subtype: 'Gólem',
+    cost: { generic: 4, arcano: 1 },
+    rarity: 'RARA',
+    rulesText: 'Resistencia (Reduce en 1 el daño recibido).',
+    flavorText: 'Fue tallado en una montaña que ya no existe. Cada paso suyo recuerda al valle que juró proteger.',
+    attack: 3,
+    maxHealth: 6,
+    cardNumber: 61,
+    artPath: '/assets/cards/art/golem-piedra.png',
+    range: 1,
+    movement: 1,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Piedra rúnica'
+  },
+  'minotauro-brasa': {
+    id: 'minotauro-brasa',
+    name: 'Minotauro de Brasa',
+    faction: 'FURIA',
+    type: 'UNIDAD',
+    subtype: 'Minotauro',
+    cost: { generic: 4, furia: 1 },
+    rarity: 'RARA',
+    rulesText: 'Carga (Puede moverse y atacar inmediatamente al ser invocado).',
+    flavorText: 'No embiste porque esté furioso. Embiste porque el mundo aún sigue en pie.',
+    attack: 5,
+    maxHealth: 4,
+    cardNumber: 62,
+    artPath: '/assets/cards/art/minotauro-brasa.png',
+    range: 1,
+    movement: 1,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Fantasía volcánica'
+  },
+  'cacique-orco': {
+    id: 'cacique-orco',
+    name: 'Cacique Orco',
+    faction: 'FURIA',
+    type: 'UNIDAD',
+    subtype: 'Guerrero',
+    cost: { generic: 5, furia: 1 },
+    rarity: 'EPICA',
+    rulesText: 'Tus otros orcos y guerreros adyacentes ganan +1 de ataque.',
+    flavorText: 'Su tribu no sigue una bandera. Sigue el sonido de su hacha golpeando el suelo.',
+    attack: 4,
+    maxHealth: 6,
+    cardNumber: 63,
+    artPath: '/assets/cards/art/cacique-orco.png',
+    range: 1,
+    movement: 1,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Guerra de fantasía'
+  },
+  'horca-renegada': {
+    id: 'horca-renegada',
+    name: 'Horca Renegada',
+    faction: 'SOMBRA',
+    type: 'ESTRUCTURA',
+    subtype: 'Artefacto',
+    cost: { generic: 3 },
+    rarity: 'RARA',
+    rulesText: 'Las unidades enemigas adyacentes tienen -1 de movimiento.',
+    flavorText: 'Nadie recuerda quién la construyó. Lo inquietante es que cada amanecer aparece una cuerda nueva.',
+    maxHealth: 4,
+    cardNumber: 64,
+    artPath: '/assets/cards/art/horca-renegada.png',
+    range: 1,
+    movement: 0,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Gótico sombrío'
+  },
+  'tumba-olvidada': {
+    id: 'tumba-olvidada',
+    name: 'Tumba Olvidada',
+    faction: 'SOMBRA',
+    type: 'ESTRUCTURA',
+    subtype: 'Cripta',
+    cost: { generic: 4 },
+    rarity: 'RARA',
+    rulesText: 'Al comienzo de tu turno, cura 1 de salud a una unidad de Sombra aliada.',
+    flavorText: 'Sus puertas no se abren hacia dentro, sino hacia todos los nombres que el mundo prefirió enterrar.',
+    maxHealth: 5,
+    cardNumber: 65,
+    artPath: '/assets/cards/art/tumba-olvidada.png',
+    range: 1,
+    movement: 0,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Ruina encantada'
+  },
+  'zombi-infectado': {
+    id: 'zombi-infectado',
+    name: 'Zombi Infectado',
+    faction: 'SOMBRA',
+    type: 'UNIDAD',
+    subtype: 'No-muerto',
+    cost: { generic: 3 },
+    rarity: 'COMUN',
+    rulesText: 'Último Aliento: Inflige 1 de daño a las unidades adyacentes.',
+    flavorText: 'La plaga no lo mantiene vivo. Solo impide que la muerte termine su trabajo.',
+    attack: 2,
+    maxHealth: 4,
+    cardNumber: 66,
+    artPath: '/assets/cards/art/zombi-infectado.png',
+    range: 1,
+    movement: 1,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Horror gótico'
+  },
+  'vampiro-noble': {
+    id: 'vampiro-noble',
+    name: 'Vampiro Noble',
+    faction: 'SOMBRA',
+    type: 'UNIDAD',
+    subtype: 'Vampiro',
+    cost: { generic: 4 },
+    rarity: 'RARA',
+    rulesText: 'Al dañar una unidad, cura 1 de salud a esta unidad.',
+    flavorText: 'Su cortesía es impecable. Por eso sus víctimas tardan tanto en comprender que ya han sido invitadas a morir.',
+    attack: 3,
+    maxHealth: 4,
+    cardNumber: 67,
+    artPath: '/assets/cards/art/vampiro-noble.png',
+    range: 1,
+    movement: 1,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Nobleza oscura'
+  },
+  'espora-venenosa': {
+    id: 'espora-venenosa',
+    name: 'Espora Venenosa',
+    faction: 'NATURALEZA',
+    type: 'HECHIZO',
+    subtype: 'Espora',
+    cost: { generic: 2 },
+    rarity: 'COMUN',
+    rulesText: 'Inflige 2 puntos de daño a una unidad seleccionada.',
+    flavorText: 'El bosque no siempre ruge. A veces basta con respirar en el lugar equivocado.',
+    cardNumber: 68,
+    artPath: '/assets/cards/art/espora-venenosa.png',
+    range: 3,
+    movement: 0,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Bosque venenoso'
+  },
+  'totem-naturaleza': {
+    id: 'totem-naturaleza',
+    name: 'Tótem de Naturaleza',
+    faction: 'NATURALEZA',
+    type: 'ESTRUCTURA',
+    subtype: 'Tótem',
+    cost: { generic: 3 },
+    rarity: 'RARA',
+    rulesText: 'Tus unidades adyacentes ganan +1 de vida máxima.',
+    flavorText: 'Sus runas no fueron escritas: crecieron lentamente bajo la corteza hasta aprender a brillar.',
+    maxHealth: 4,
+    cardNumber: 69,
+    artPath: '/assets/cards/art/totem-naturaleza.png',
+    range: 1,
+    movement: 0,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Naturaleza rúnica'
+  },
+  'centauro-guerrero': {
+    id: 'centauro-guerrero',
+    name: 'Centauro Guerrero',
+    faction: 'NATURALEZA',
+    type: 'UNIDAD',
+    subtype: 'Centauro',
+    cost: { generic: 3 },
+    rarity: 'COMUN',
+    rulesText: 'Movimiento Diagonal: Puede desplazarse y atacar diagonalmente.',
+    flavorText: 'Donde otros ven maleza, él ve avenidas de guerra abiertas por el viento.',
+    attack: 3,
+    maxHealth: 3,
+    cardNumber: 70,
+    artPath: '/assets/cards/art/centauro-guerrero.png',
+    range: 1,
+    movement: 2,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Bosque guerrero'
+  },
+  'fauno-bosque': {
+    id: 'fauno-bosque',
+    name: 'Fauno del Bosque',
+    faction: 'NATURALEZA',
+    type: 'UNIDAD',
+    subtype: 'Fauno',
+    cost: { generic: 2 },
+    rarity: 'COMUN',
+    rulesText: 'Grito de Batalla: Cura 1 de salud a una unidad aliada adyacente.',
+    flavorText: 'Su melodía hace que las setas despierten y que las heridas recuerden cómo cerrarse.',
+    attack: 1,
+    maxHealth: 3,
+    cardNumber: 71,
+    artPath: '/assets/cards/art/fauno-bosque.png',
+    range: 1,
+    movement: 1,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Fantasía forestal'
+  },
+  'obelisco-estelar': {
+    id: 'obelisco-estelar',
+    name: 'Obelisco Estelar',
+    faction: 'ARCANO',
+    type: 'ESTRUCTURA',
+    subtype: 'Obelisco',
+    cost: { generic: 4, arcano: 1 },
+    rarity: 'EPICA',
+    rulesText: 'Al comienzo de tu turno, roba 1 carta si controlas una unidad adyacente.',
+    flavorText: 'No apunta al cielo: es el cielo quien parece inclinarse para leerlo.',
+    maxHealth: 5,
+    cardNumber: 72,
+    artPath: '/assets/cards/art/obelisco-estelar.png',
+    range: 1,
+    movement: 0,
+    artist: 'Archivo del Nexo',
+    artistStyle: 'Arcano estelar'
   },
   'obstaculo-lava': {
     id: 'obstaculo-lava',
@@ -740,9 +1344,9 @@ export const CARDS_DB: Record<string, Card> = {
     subtype: 'Obstáculo',
     cost: { generic: 99 },
     rarity: 'COMUN',
-    rulesText: 'Bloquea el paso. Intransitable por cualquier criatura.',
+    rulesText: 'Bloquea el paso. Puede destruirse para abrir una ruta.',
     flavorText: '«Una profunda grieta que expulsa vapores sulfúricos. Cruzarla es una muerte segura.»',
-    maxHealth: 99,
+    maxHealth: 5,
     cardNumber: 0,
     artPath: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect width="100%" height="100%" fill="%232d0b0b"/><circle cx="100" cy="100" r="60" fill="%23ef4444" opacity="0.3" filter="blur(5px)"/><polygon points="70,50 130,50 140,150 60,150" fill="%237f1d1d" stroke="%23f59e0b" stroke-width="4"/><circle cx="100" cy="100" r="15" fill="%23f59e0b"/></svg>',
     range: 1,
@@ -758,17 +1362,200 @@ export const CARDS_DB: Record<string, Card> = {
     subtype: 'Obstáculo',
     cost: { generic: 99 },
     rarity: 'COMUN',
-    rulesText: 'Bloquea el paso. Resiste el impacto del combate.',
+    rulesText: 'Bloquea el paso y la vision. Al destruirlo, roba 1 carta.',
     flavorText: '«Un monolito erigido en el centro del Nexo que canaliza energías magnéticas.»',
-    maxHealth: 99,
+    maxHealth: 4,
     cardNumber: 0,
     artPath: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect width="100%" height="100%" fill="%230f172a"/><circle cx="100" cy="100" r="60" fill="%2306b6d4" opacity="0.3" filter="blur(5px)"/><rect x="75" y="40" width="50" height="120" fill="%231e293b" stroke="%233b82f6" stroke-width="4"/><path d="M 90 70 L 110 70 M 100 70 L 100 130" stroke="%2306b6d4" stroke-width="3"/></svg>',
     range: 1,
     movement: 0,
     artist: 'Constructores del Domo',
     artistStyle: 'Rúnico'
+  },
+  'obstaculo-risco': {
+    id: 'obstaculo-risco',
+    name: 'Risco Quebrado',
+    faction: 'ORDEN',
+    type: 'ESTRUCTURA',
+    subtype: 'Obstáculo',
+    cost: { generic: 99 },
+    rarity: 'COMUN',
+    rulesText: 'Bloquea el paso. Da cobertura a unidades adyacentes contra ataques a distancia.',
+    flavorText: 'Una cresta de piedra suspendida, erosionada por siglos de tormentas celestes.',
+    maxHealth: 6,
+    cardNumber: 0,
+    artPath: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect width="100%" height="100%" fill="%231a2934"/><polygon points="20,165 72,38 112,125 151,54 184,165" fill="%23798e9a" stroke="%23c5d3da" stroke-width="4"/></svg>',
+    range: 1,
+    movement: 0,
+    artist: 'Canteros del Santuario',
+    artistStyle: 'Piedra Tallada'
+  },
+  'obstaculo-corriente': {
+    id: 'obstaculo-corriente',
+    name: 'Corriente Arcana',
+    faction: 'ARCANO',
+    type: 'ESTRUCTURA',
+    subtype: 'Obstáculo',
+    cost: { generic: 99 },
+    rarity: 'COMUN',
+    rulesText: 'Bloquea el paso. Ralentiza unidades adyacentes. Al destruirla, recupera 1 mana gastado.',
+    flavorText: 'Un cauce de energía viva que solo cede cuando su sello se fragmenta.',
+    maxHealth: 3,
+    cardNumber: 0,
+    artPath: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect width="100%" height="100%" fill="%230b1b32"/><path d="M10 120 C45 65 70 170 105 95 S165 80 190 32" fill="none" stroke="%2354dfff" stroke-width="18"/><path d="M10 120 C45 65 70 170 105 95 S165 80 190 32" fill="none" stroke="%23d6fbff" stroke-width="4"/></svg>',
+    range: 1,
+    movement: 0,
+    artist: 'Canalizadores del Domo',
+    artistStyle: 'Flujo Rúnico'
   }
 };
+
+Object.assign(CARDS_DB, {
+  'fuente-naturaleza': {
+    id: 'fuente-naturaleza',
+    name: 'Fuente de Naturaleza',
+    faction: 'NATURALEZA',
+    type: 'MANA',
+    subtype: 'Recurso de Vida',
+    cost: { generic: 0 },
+    rarity: 'COMUN',
+    rulesText: 'Genera 1 de mana de Naturaleza. Limite de una fuente jugada por turno.',
+    flavorText: 'Las raices del Nexo guardan fuerza incluso por encima de las nubes.',
+    cardNumber: 0,
+    artPath: '/assets/cards/art/totem-naturaleza.png',
+    range: 1,
+    movement: 0,
+    artist: 'Cronicas del Nexo',
+    artistStyle: 'Naturaleza runica',
+  },
+  'fuente-orden': {
+    id: 'fuente-orden',
+    name: 'Fuente de Orden',
+    faction: 'ORDEN',
+    type: 'MANA',
+    subtype: 'Recurso de Luz',
+    cost: { generic: 0 },
+    rarity: 'COMUN',
+    rulesText: 'Genera 1 de mana de Orden. Limite de una fuente jugada por turno.',
+    flavorText: 'Una promesa de luz convertida en disciplina y poder.',
+    cardNumber: 0,
+    artPath: '/assets/cards/art/grifo-orden.webp',
+    range: 1,
+    movement: 0,
+    artist: 'Cronicas del Nexo',
+    artistStyle: 'Fantasia celestial',
+  },
+  'fuente-sombra': {
+    id: 'fuente-sombra',
+    name: 'Fuente de Sombra',
+    faction: 'SOMBRA',
+    type: 'MANA',
+    subtype: 'Recurso Umbrio',
+    cost: { generic: 0 },
+    rarity: 'COMUN',
+    rulesText: 'Genera 1 de mana de Sombra. Limite de una fuente jugada por turno.',
+    flavorText: 'Cada secreto enterrado alimenta la oscuridad que aguarda bajo el santuario.',
+    cardNumber: 0,
+    artPath: '/assets/cards/art/tumba-olvidada.png',
+    range: 1,
+    movement: 0,
+    artist: 'Cronicas del Nexo',
+    artistStyle: 'Ruina encantada',
+  },
+  'fuente-vacio': {
+    id: 'fuente-vacio',
+    name: 'Fuente del Vacio',
+    faction: 'VACIO',
+    type: 'MANA',
+    subtype: 'Recurso Cosmico',
+    cost: { generic: 0 },
+    rarity: 'COMUN',
+    rulesText: 'Genera 1 de mana de Vacio. Limite de una fuente jugada por turno.',
+    flavorText: 'Donde termina la realidad comienza una corriente imposible de contener.',
+    cardNumber: 0,
+    artPath: '/assets/cards/art/obelisco-estelar.png',
+    range: 1,
+    movement: 0,
+    artist: 'Cronicas del Nexo',
+    artistStyle: 'Fantasia cosmica',
+  },
+  'comandante-naturaleza': {
+    id: 'comandante-naturaleza',
+    name: 'Elandra, Voz de las Raices',
+    faction: 'NATURALEZA',
+    type: 'COMANDANTE',
+    subtype: 'Guardiana ancestral',
+    cost: { generic: 0 },
+    rarity: 'LEGENDARIA',
+    rulesText: 'Comandante. Tus fuerzas prosperan alrededor del Nexo.',
+    flavorText: 'Mientras una raiz permanezca viva, el santuario no caera.',
+    attack: 2,
+    maxHealth: 25,
+    cardNumber: 0,
+    artPath: '/assets/cards/art/totem-naturaleza.png',
+    range: 1,
+    movement: 1,
+    artist: 'Cronicas del Nexo',
+    artistStyle: 'Naturaleza runica',
+  },
+  'comandante-orden': {
+    id: 'comandante-orden',
+    name: 'Aureon, Mariscal del Alba',
+    faction: 'ORDEN',
+    type: 'COMANDANTE',
+    subtype: 'Mariscal celestial',
+    cost: { generic: 0 },
+    rarity: 'LEGENDARIA',
+    rulesText: 'Comandante. La formacion es la primera defensa del Nexo.',
+    flavorText: 'Su estandarte permanece en pie cuando las torres empiezan a caer.',
+    attack: 2,
+    maxHealth: 25,
+    cardNumber: 0,
+    artPath: '/assets/cards/art/grifo-orden.webp',
+    range: 1,
+    movement: 1,
+    artist: 'Cronicas del Nexo',
+    artistStyle: 'Fantasia celestial',
+  },
+  'comandante-sombra': {
+    id: 'comandante-sombra',
+    name: 'Nocthar, Senor del Pacto',
+    faction: 'SOMBRA',
+    type: 'COMANDANTE',
+    subtype: 'Noble inmortal',
+    cost: { generic: 0 },
+    rarity: 'LEGENDARIA',
+    rulesText: 'Comandante. Cada perdida alimenta un juramento mas oscuro.',
+    flavorText: 'No necesita una corona cuando todos recuerdan su deuda.',
+    attack: 2,
+    maxHealth: 25,
+    cardNumber: 0,
+    artPath: '/assets/cards/art/vampiro-noble.png',
+    range: 1,
+    movement: 1,
+    artist: 'Cronicas del Nexo',
+    artistStyle: 'Nobleza oscura',
+  },
+  'comandante-vacio': {
+    id: 'comandante-vacio',
+    name: 'Orun, Heraldo de la Entropia',
+    faction: 'VACIO',
+    type: 'COMANDANTE',
+    subtype: 'Heraldo cosmico',
+    cost: { generic: 0 },
+    rarity: 'LEGENDARIA',
+    rulesText: 'Comandante. El campo se deforma alrededor de su voluntad.',
+    flavorText: 'Su llegada no hace ruido; es el mundo el que deja de responder.',
+    attack: 2,
+    maxHealth: 25,
+    cardNumber: 0,
+    artPath: '/assets/cards/art/devorador-entropico.webp',
+    range: 1,
+    movement: 1,
+    artist: 'Cronicas del Nexo',
+    artistStyle: 'Fantasia cosmica',
+  },
+} satisfies Record<string, Card>);
 
 // ═══════════════════════════════════════════════════
 // DYNAMIC SVG ILLUSTRATION GENERATOR FOR ALL 400 CARDS
@@ -947,57 +1734,124 @@ function generateRemainingCards() {
   const arcanoNounsSpells = ['Prisión', 'Vórtice', 'Cometa', 'Tormenta', 'Congelación', 'Destello', 'Ventisca', 'Runa', 'Hechizo', 'Ráfaga', 'Ilusión', 'Vacío'];
   const arcanoAdjectives = ['Glaciar', 'Celestial', 'del Cosmos', 'Rúnico', 'Estelar', 'Escarchado', 'Glacial', 'de Hielo', 'de Maná', 'Temporal', 'del Nexo', 'Sagrado', 'Espectral', 'del Vacío', 'Silencioso', 'Cristalino', 'Eterno'];
 
+  // Naturaleza vocabulary
+  const naturalezaNounsUnits = ['Elfo', 'Bestia', 'Lobo', 'Fauno', 'Ciervo', 'Oso', 'Ninfa', 'Arbusto', 'Guía', 'Dríada', 'Centauro', 'Lémur', 'Árbol', 'Tejón', 'Águila'];
+  const naturalezaNounsStructs = ['Arboleda', 'Nido', 'Raíz', 'Santuario', 'Bosque', 'Tótem', 'Invernadero'];
+  const naturalezaNounsSpells = ['Crecimiento', 'Sanación', 'Semilla', 'Polen', 'Espora', 'Abrazo', 'Florescencia', 'Liana', 'Ciclo'];
+  const naturalezaAdjectives = ['Luminoso', 'Salvaje', 'Ancestral', 'Espiritual', 'Verde', 'Floreciente', 'Humedecido', 'Primaveral', 'del Bosque', 'Silvestre', 'Espeso'];
+
+  // Sombra vocabulary
+  const sombraNounsUnits = ['Espectro', 'Sombra', 'Orco', 'Renegado', 'Nigromante', 'Vampiro', 'Necrófago', 'Esqueleto', 'Zombi', 'Demonio', 'Parca', 'Verdugo', 'Murciélago'];
+  const sombraNounsStructs = ['Tumba', 'Cripta', 'Mausoleo', 'Abismo', 'Fosa', 'Mazmorra', 'Guillotina'];
+  const sombraNounsSpells = ['Maldición', 'Oscuridad', 'Drenaje', 'Corrupción', 'Plaga', 'Pesadilla', 'Sacrificio', 'Marchitez', 'Olvido'];
+  const sombraAdjectives = ['Umbrío', 'Siniestro', 'Mortal', 'Corrupto', 'Espectral', 'Oscuro', 'No-Muerto', 'Vampírico', 'de la Cripta', 'Fúnebre', 'Renegado'];
+
+  // Vacío vocabulary
+  const vacioNounsUnits = ['Horror', 'Engendro', 'Devorador', 'Parásito', 'Leviatán', 'Mutante', 'Desgarrador', 'Paradoja', 'Sombra', 'Enigma'];
+  const vacioNounsStructs = ['Falla', 'Grieta', 'Domo', 'Vacío', 'Portal', 'Singularidad'];
+  const vacioNounsSpells = ['Aniquilación', 'Consunción', 'Distorsión', 'Vacío', 'Desintegración', 'Agujero', 'Succión'];
+  const vacioAdjectives = ['del Vacío', 'Abisal', 'Silencioso', 'Desolador', 'Vacante', 'Inexistente', 'Negro', 'Entrópico', 'Paralizante'];
+
+  // Orden (Air & Light) vocabulary
+  const ordenNounsUnits = ['Caballero', 'Ángel', 'Paladín', 'Clérigo', 'Grifo', 'Águila', 'Centinela', 'Inquisidor', 'Sacerdote', 'Halcón', 'Pegaso'];
+  const ordenNounsStructs = ['Catedral', 'Fortaleza', 'Monumento', 'Castillo', 'Altar', 'Faro'];
+  const ordenNounsSpells = ['Juicio', 'Bendición', 'Justicia', 'Orden', 'Ascensión', 'Destello', 'Castigo', 'Soplido'];
+  const ordenAdjectives = ['Sagrado', 'Celestial', 'del Aire', 'Brillante', 'Justo', 'Puro', 'Glorioso', 'del Alba', 'Solar', 'Divino', 'Eólico'];
+
   const getSubtype = (type: string, noun: string) => {
     if (type === 'ESTRUCTURA') return 'Edificio';
     if (type === 'HECHIZO') return 'Magia';
-    if (['Trasgo', 'Trasgos'].includes(noun)) return 'Trasgo';
+    if (['Trasgo', 'Trasgos', 'Orco', 'Orcos'].includes(noun)) return 'Guerrero';
     if (['Dragón', 'Draco'].includes(noun)) return 'Dragón';
-    if (['Elemental', 'Bestia', 'Minotauro', 'Basilisco', 'Quimera', 'Fénix', 'Grifo', 'Búho'].includes(noun)) return noun;
+    if (['Elemental', 'Bestia', 'Minotauro', 'Basilisco', 'Quimera', 'Fénix', 'Grifo', 'Búho', 'Lobo', 'Oso', 'Ciervo', 'Grifo', 'Pegaso', 'Halcón', 'Águila'].includes(noun)) return noun;
     return 'Guerrero';
   };
 
-  // Generate 360 unique cards to reach 400 (base index 41 to 400)
-  for (let i = 41; i <= 400; i++) {
-    const faction = i % 2 === 0 ? 'FURIA' : 'ARCANO';
+  const factions: Faction[] = ['FURIA', 'ARCANO', 'NATURALEZA', 'ORDEN', 'SOMBRA', 'VACIO'];
+
+  // Generate the remaining unique cards to reach 400 after the curated additions.
+  for (let i = 73; i <= 400; i++) {
+    const faction = factions[i % factions.length];
     const type = cardTypes[(i + 1) % cardTypes.length];
     const rarity = rarities[i % rarities.length];
 
     let name = '';
     let noun = '';
     let adj = '';
+
     if (faction === 'FURIA') {
       adj = furiaAdjectives[(i * 3) % furiaAdjectives.length];
       if (type === 'UNIDAD') {
         noun = furiaNounsUnits[(i * 7) % furiaNounsUnits.length];
-        name = `${noun} ${adj}`;
       } else if (type === 'ESTRUCTURA') {
         noun = furiaNounsStructs[(i * 7) % furiaNounsStructs.length];
-        name = `${noun} ${adj}`;
       } else {
         noun = furiaNounsSpells[(i * 7) % furiaNounsSpells.length];
-        name = `${noun} ${adj}`;
       }
-    } else {
+      name = `${noun} ${adj}`;
+    } else if (faction === 'ARCANO') {
       adj = arcanoAdjectives[(i * 3) % arcanoAdjectives.length];
       if (type === 'UNIDAD') {
         noun = arcanoNounsUnits[(i * 7) % arcanoNounsUnits.length];
-        name = `${noun} ${adj}`;
       } else if (type === 'ESTRUCTURA') {
         noun = arcanoNounsStructs[(i * 7) % arcanoNounsStructs.length];
-        name = `${noun} ${adj}`;
       } else {
         noun = arcanoNounsSpells[(i * 7) % arcanoNounsSpells.length];
-        name = `${noun} ${adj}`;
       }
+      name = `${noun} ${adj}`;
+    } else if (faction === 'NATURALEZA') {
+      adj = naturalezaAdjectives[(i * 3) % naturalezaAdjectives.length];
+      if (type === 'UNIDAD') {
+        noun = naturalezaNounsUnits[(i * 7) % naturalezaNounsUnits.length];
+      } else if (type === 'ESTRUCTURA') {
+        noun = naturalezaNounsStructs[(i * 7) % naturalezaNounsStructs.length];
+      } else {
+        noun = naturalezaNounsSpells[(i * 7) % naturalezaNounsSpells.length];
+      }
+      name = `${noun} ${adj}`;
+    } else if (faction === 'SOMBRA') {
+      adj = sombraAdjectives[(i * 3) % sombraAdjectives.length];
+      if (type === 'UNIDAD') {
+        noun = sombraNounsUnits[(i * 7) % sombraNounsUnits.length];
+      } else if (type === 'ESTRUCTURA') {
+        noun = sombraNounsStructs[(i * 7) % sombraNounsStructs.length];
+      } else {
+        noun = sombraNounsSpells[(i * 7) % sombraNounsSpells.length];
+      }
+      name = `${noun} ${adj}`;
+    } else if (faction === 'VACIO') {
+      adj = vacioAdjectives[(i * 3) % vacioAdjectives.length];
+      if (type === 'UNIDAD') {
+        noun = vacioNounsUnits[(i * 7) % vacioNounsUnits.length];
+      } else if (type === 'ESTRUCTURA') {
+        noun = vacioNounsStructs[(i * 7) % vacioNounsStructs.length];
+      } else {
+        noun = vacioNounsSpells[(i * 7) % vacioNounsSpells.length];
+      }
+      name = `${noun} ${adj}`;
+    } else { // ORDEN
+      adj = ordenAdjectives[(i * 3) % ordenAdjectives.length];
+      if (type === 'UNIDAD') {
+        noun = ordenNounsUnits[(i * 7) % ordenNounsUnits.length];
+      } else if (type === 'ESTRUCTURA') {
+        noun = ordenNounsStructs[(i * 7) % ordenNounsStructs.length];
+      } else {
+        noun = ordenNounsSpells[(i * 7) % ordenNounsSpells.length];
+      }
+      name = `${noun} ${adj}`;
     }
 
     const totalCost = (i % 6) + 1; // 1 to 6
-    const factionCost = Math.min(totalCost, (i % 2) + 1);
-    const genericCost = totalCost - factionCost;
-    const cost = {
-      generic: genericCost,
-      [faction.toLowerCase()]: factionCost
-    } as any;
+    let cost: any;
+    if (faction === 'FURIA') {
+      const factionCost = Math.min(totalCost, (i % 2) + 1);
+      cost = { generic: totalCost - factionCost, furia: factionCost };
+    } else if (faction === 'ARCANO') {
+      const factionCost = Math.min(totalCost, (i % 2) + 1);
+      cost = { generic: totalCost - factionCost, arcano: factionCost };
+    } else {
+      cost = { generic: totalCost };
+    }
 
     let attack: number | undefined;
     let maxHealth: number | undefined;
@@ -1060,9 +1914,109 @@ function generateRemainingCards() {
 
     // Override with high-fidelity generated assets if names match
     if (name === 'Mago Celestial' || name === 'Mago Rúnico') {
-      artPath = '/assets/cards/art/mago-celestial.png';
+      artPath = '/assets/cards/art/mago-celestial.webp';
     } else if (name === 'Guerrero Carmesí' || name === 'Guerrero Ígneo') {
-      artPath = '/assets/cards/art/guerrero-igneo.png';
+      artPath = '/assets/cards/art/guerrero-igneo.webp';
+    } else if (name.includes('Guardián Escarchado') || name.includes('Guardián Glacial')) {
+      artPath = '/assets/cards/art/guardian-escarchado.webp';
+    } else if (name.includes('Titán Infernal') || name.includes('Titán Volcánico')) {
+      artPath = '/assets/cards/art/titan-infernal.webp';
+    } else if (name.includes('Dragón') || name.includes('Draco')) {
+      artPath = '/assets/cards/art/dragon-escarcha.webp';
+    } else if (name.includes('Nigromante')) {
+      artPath = '/assets/cards/art/nigromante-oscuro.webp';
+    } else if (name.includes('Elfo') || name.includes('Dríada')) {
+      artPath = '/assets/cards/art/elfo-ancestral.webp';
+    } else if (name.includes('Vampiro')) {
+      artPath = '/assets/cards/art/vampiro-noble.png';
+    } else if (name.includes('Paladín') || name.includes('Caballero')) {
+      artPath = '/assets/cards/art/paladin-glorioso.webp';
+    } else if (name.includes('Ángel')) {
+      artPath = '/assets/cards/art/angel-celestial.webp';
+    } else if (name.includes('Horror') || name.includes('Engendro') || name.includes('Devorador')) {
+      artPath = '/assets/cards/art/horror-abisal.webp';
+    } else if (name.includes('Lobo')) {
+      artPath = '/assets/cards/art/lobo-salvaje.webp';
+    } else if (name.includes('Minotauro')) {
+      artPath = '/assets/cards/art/minotauro-brasa.png';
+    } else if (name.includes('Centauro')) {
+      artPath = '/assets/cards/art/centauro-guerrero.png';
+    } else if (name.includes('Fauno')) {
+      artPath = '/assets/cards/art/fauno-bosque.png';
+    } else if (name.includes('Falla') || name.includes('Grieta')) {
+      artPath = '/assets/cards/art/falla-vacio.webp';
+    } else if (name.includes('Monumento')) {
+      artPath = '/assets/cards/art/monumento-sagrado.webp';
+    } else if (name.includes('Tumba')) {
+      artPath = '/assets/cards/art/tumba-olvidada.png';
+    } else if (name.includes('Cripta')) {
+      artPath = '/assets/cards/art/cripta-mortal.webp';
+    } else if (name.includes('Tótem') || name.includes('Totem')) {
+      artPath = '/assets/cards/art/totem-naturaleza.png';
+    } else if (name.includes('Arboleda') || name.includes('Bosque')) {
+      artPath = '/assets/cards/art/arboleda-sagrada.webp';
+    } else if (name.includes('Quimera')) {
+      artPath = '/assets/cards/art/quimera-caos.webp';
+    } else if (name.includes('Maldición')) {
+      artPath = '/assets/cards/art/maldicion-sombra.webp';
+    } else if (name.includes('Crecimiento')) {
+      artPath = '/assets/cards/art/crecimiento-salvaje.webp';
+    } else if (name.includes('Aniquilación')) {
+      artPath = '/assets/cards/art/aniquilacion-vacio.webp';
+    } else if (name.includes('Juicio')) {
+      artPath = '/assets/cards/art/juicio-divino.webp';
+    } else if (name.includes('Gigante') || name.includes('Asolador')) {
+      artPath = '/assets/cards/art/gigante-magma.webp';
+    } else if (name.includes('Golem')) {
+      artPath = '/assets/cards/art/golem-piedra.png';
+    } else if (name.includes('Espectro') || name.includes('Sombra')) {
+      artPath = '/assets/cards/art/espectro-siniestro.webp';
+    } else if (name.includes('Guillotina')) {
+      artPath = '/assets/cards/art/horca-renegada.png';
+    } else if (name.includes('Renegado') || name.includes('Esclavo')) {
+      artPath = '/assets/cards/art/renegado-oscuro.webp';
+    } else if (name.includes('Basilisco')) {
+      artPath = '/assets/cards/art/basilisco-caos.webp';
+    } else if (name.includes('Pesadilla')) {
+      artPath = '/assets/cards/art/pesadilla-mortal.webp';
+    } else if (name.includes('Santuario')) {
+      artPath = '/assets/cards/art/santuario-sagrado.webp';
+    } else if (name.includes('Paradoja')) {
+      artPath = '/assets/cards/art/paradoja-vacio.webp';
+    } else if (name.includes('Oso')) {
+      artPath = '/assets/cards/art/oso-forestal.webp';
+    } else if (name.includes('Ciervo')) {
+      artPath = '/assets/cards/art/ciervo-sagrado.webp';
+    } else if (name.includes('Águila')) {
+      artPath = '/assets/cards/art/aguila-celestial.webp';
+    } else if (name.includes('Esqueleto')) {
+      artPath = '/assets/cards/art/esqueleto-guerrero.webp';
+    } else if (name.includes('Zombi') || name.includes('Necrófago')) {
+      artPath = '/assets/cards/art/zombi-infectado.png';
+    } else if (name.includes('Demonio')) {
+      artPath = '/assets/cards/art/demonio-infernal.webp';
+    } else if (name.includes('Murciélago')) {
+      artPath = '/assets/cards/art/murcielago-sombra.webp';
+    } else if (name.includes('Parásito')) {
+      artPath = '/assets/cards/art/parasito-vacio.webp';
+    } else if (name.includes('Leviatán')) {
+      artPath = '/assets/cards/art/leviatan-abisal.webp';
+    } else if (name.includes('Grifo')) {
+      artPath = '/assets/cards/art/grifo-orden.webp';
+    } else if (name.includes('Pegaso')) {
+      artPath = '/assets/cards/art/pegaso-celestial.webp';
+    } else if (name.includes('Clérigo') || name.includes('Sacerdote')) {
+      artPath = '/assets/cards/art/clerigo-luz.webp';
+    } else if (name.includes('Comandante') || name.includes('Jefe') || name.includes('Cacique')) {
+      artPath = '/assets/cards/art/cacique-orco.png';
+    } else if (name.includes('Orco')) {
+      artPath = '/assets/cards/art/orco-guerrero.webp';
+    } else if (name.includes('Obelisco')) {
+      artPath = '/assets/cards/art/obelisco-estelar.png';
+    } else if (name.includes('Espora')) {
+      artPath = '/assets/cards/art/espora-venenosa.png';
+    } else if (name.includes('Biblioteca') || name.includes('Archivo') || name.includes('Monolito')) {
+      artPath = '/assets/cards/art/biblioteca-runica.webp';
     }
 
     CARDS_DB[id] = {
@@ -1090,10 +2044,505 @@ function generateRemainingCards() {
 // Generate the remaining 360 cards immediately
 generateRemainingCards();
 
-export function getPreconstructedDeck(factionOrTheme: string): Card[] {
+function applyFactionCosts() {
+  for (const card of Object.values(CARDS_DB)) {
+    if (card.type === 'MANA' || card.type === 'COMANDANTE' || card.cardNumber === 0) continue;
+
+    const manaType = factionToManaType(card.faction);
+    const coloredCost = MANA_TYPES.reduce((total, type) => total + (card.cost[type] ?? 0), 0);
+    const factionRequirement = coloredCost > 0 ? coloredCost : card.cost.generic > 0 ? 1 : 0;
+    const generic = coloredCost > 0 ? card.cost.generic : Math.max(0, card.cost.generic - factionRequirement);
+
+    card.cost = { generic, [manaType]: factionRequirement };
+  }
+}
+
+applyFactionCosts();
+
+const COMMANDER_CARD_IDS: Record<Faction, string> = {
+  FURIA: 'comandante-furia',
+  ARCANO: 'comandante-arcano',
+  NATURALEZA: 'comandante-naturaleza',
+  ORDEN: 'comandante-orden',
+  SOMBRA: 'comandante-sombra',
+  VACIO: 'comandante-vacio',
+};
+
+export function getCommanderForFaction(faction: Faction): Card {
+  return CARDS_DB[COMMANDER_CARD_IDS[faction]];
+}
+
+type DeckRecipeEntry = { id: string; count: number };
+type ManaPlan = Partial<Record<ManaType, number>>;
+type CuratedDeckRecipe = { mana: ManaPlan; cards: DeckRecipeEntry[] };
+
+const CURATED_DECK_RECIPES: Record<DeckId, CuratedDeckRecipe> = {
+  FURIA_EMBESTIDA: {
+    mana: { furia: 20, arcano: 0 },
+    cards: [
+      { id: 'sabueso-brasa', count: 4 },
+      { id: 'infiltrado-volcanico', count: 4 },
+      { id: 'guerrero-ceniza', count: 4 },
+      { id: 'orco-guerrero', count: 4 },
+      { id: 'berserker-ignivoro', count: 1 },
+      { id: 'minotauro-brasa', count: 4 },
+      { id: 'cacique-orco', count: 2 },
+      { id: 'draco-magma', count: 1 },
+      { id: 'chispa-fugaz', count: 1 },
+      { id: 'lluvia-ceniza', count: 2 },
+      { id: 'impetu-fuego', count: 1 },
+      { id: 'furia-nexo', count: 2 },
+    ],
+  },
+  FURIA_CALDERA: {
+    mana: { furia: 20, arcano: 0 },
+    cards: [
+      { id: 'muro-pomez', count: 3 },
+      { id: 'forja-carmesi', count: 3 },
+      { id: 'pilar-fuego', count: 2 },
+      { id: 'elemental-lava', count: 3 },
+      { id: 'golem-fundicion', count: 3 },
+      { id: 'draco-magma', count: 2 },
+      { id: 'gigante-magma', count: 2 },
+      { id: 'dragon-caldera', count: 2 },
+      { id: 'lluvia-ceniza', count: 3 },
+      { id: 'erupcion-volcanica', count: 2 },
+      { id: 'furia-nexo', count: 2 },
+      { id: 'fenix-renacido', count: 3 },
+    ],
+  },
+  ARCANO_GLACIAL: {
+    mana: { furia: 0, arcano: 20 },
+    cards: [
+      { id: 'centinela-cristal', count: 3 },
+      { id: 'tejedora-escarcha', count: 3 },
+      { id: 'guardian-escarchado', count: 3 },
+      { id: 'golem-glaciar', count: 2 },
+      { id: 'golem-piedra', count: 2 },
+      { id: 'mago-runa-helada', count: 3 },
+      { id: 'barrera-hielo', count: 3 },
+      { id: 'prision-glacial', count: 3 },
+      { id: 'congelacion-rapida', count: 3 },
+      { id: 'cometa-arcano', count: 2 },
+      { id: 'torre-horizonte', count: 3 },
+    ],
+  },
+  ARCANO_ESTELAR: {
+    mana: { furia: 0, arcano: 20 },
+    cards: [
+      { id: 'aprendiz-nexo', count: 2 },
+      { id: 'buho-runico', count: 3 },
+      { id: 'tejedora-tiempo', count: 2 },
+      { id: 'vortice-mana', count: 1 },
+      { id: 'cometa-arcano', count: 4 },
+      { id: 'tormenta-mana', count: 2 },
+      { id: 'biblioteca-runica', count: 1 },
+      { id: 'obelisco-estelar', count: 2 },
+      { id: 'avatar-cosmos', count: 2 },
+      { id: 'elemental-tormenta', count: 3 },
+      { id: 'centinela-cristal', count: 4 },
+      { id: 'mago-runa-helada', count: 3 },
+      { id: 'templo-runico', count: 1 },
+    ],
+  },
+  NATURALEZA_RAICES: {
+    mana: { naturaleza: 13, arcano: 7 },
+    cards: [
+      { id: 'fauno-bosque', count: 4 },
+      { id: 'centauro-guerrero', count: 4 },
+      { id: 'basilisco-caos', count: 4 },
+      { id: 'buho-runico', count: 3 },
+      { id: 'elemental-tormenta', count: 3 },
+      { id: 'centinela-cristal', count: 2 },
+      { id: 'espora-venenosa', count: 3 },
+      { id: 'golem-piedra', count: 3 },
+      { id: 'totem-naturaleza', count: 4 },
+    ],
+  },
+  NATURALEZA_GUARDIANES: {
+    mana: { naturaleza: 10, arcano: 10 },
+    cards: [
+      { id: 'totem-naturaleza', count: 3 },
+      { id: 'fauno-bosque', count: 3 },
+      { id: 'basilisco-caos', count: 3 },
+      { id: 'centauro-guerrero', count: 3 },
+      { id: 'espora-venenosa', count: 3 },
+      { id: 'elemental-tormenta', count: 3 },
+      { id: 'buho-runico', count: 3 },
+      { id: 'golem-piedra', count: 3 },
+      { id: 'guardian-escarchado', count: 3 },
+      { id: 'barrera-hielo', count: 3 },
+    ],
+  },
+  ORDEN_ALBA: {
+    mana: { orden: 9, arcano: 11 },
+    cards: [
+      { id: 'pegaso-celestial', count: 4 },
+      { id: 'grifo-orden', count: 4 },
+      { id: 'clerigo-luz', count: 3 },
+      { id: 'juicio-divino', count: 3 },
+      { id: 'guardian-escarchado', count: 3 },
+      { id: 'centinela-cristal', count: 3 },
+      { id: 'golem-runico', count: 3 },
+      { id: 'torre-horizonte', count: 2 },
+      { id: 'templo-runico', count: 2 },
+      { id: 'destello-runico', count: 3 },
+    ],
+  },
+  ORDEN_BASTION: {
+    mana: { orden: 9, arcano: 11 },
+    cards: [
+      { id: 'clerigo-luz', count: 4 },
+      { id: 'golem-runico', count: 3 },
+      { id: 'guardian-escarchado', count: 3 },
+      { id: 'centinela-cristal', count: 3 },
+      { id: 'barrera-hielo', count: 3 },
+      { id: 'pegaso-celestial', count: 3 },
+      { id: 'grifo-orden', count: 3 },
+      { id: 'templo-runico', count: 3 },
+      { id: 'juicio-divino', count: 3 },
+      { id: 'biblioteca-runica', count: 2 },
+    ],
+  },
+  SOMBRA_CRIPTA: {
+    mana: { sombra: 20 },
+    cards: [
+      { id: 'zombi-hambriento', count: 4 },
+      { id: 'zombi-infectado', count: 4 },
+      { id: 'esqueleto-guerrero', count: 4 },
+      { id: 'espectro-siniestro', count: 3 },
+      { id: 'murcielago-sombra', count: 3 },
+      { id: 'tumba-olvidada', count: 3 },
+      { id: 'horca-renegada', count: 2 },
+      { id: 'vampiro-noble', count: 2 },
+      { id: 'pesadilla-mortal', count: 3 },
+      { id: 'demonio-infernal', count: 2 },
+    ],
+  },
+  SOMBRA_NOBLEZA: {
+    mana: { sombra: 20 },
+    cards: [
+      { id: 'vampiro-noble', count: 4 },
+      { id: 'demonio-infernal', count: 3 },
+      { id: 'pesadilla-mortal', count: 3 },
+      { id: 'espectro-siniestro', count: 3 },
+      { id: 'murcielago-sombra', count: 3 },
+      { id: 'esqueleto-guerrero', count: 3 },
+      { id: 'zombi-infectado', count: 3 },
+      { id: 'horca-renegada', count: 2 },
+      { id: 'tumba-olvidada', count: 3 },
+      { id: 'zombi-hambriento', count: 3 },
+    ],
+  },
+  VACIO_ABISMO: {
+    mana: { vacio: 5, naturaleza: 2, arcano: 13 },
+    cards: [
+      { id: 'parasito-vacio', count: 4 },
+      { id: 'devorador-entropico', count: 2 },
+      { id: 'leviatan-abisal', count: 2 },
+      { id: 'basilisco-caos', count: 3 },
+      { id: 'golem-runico', count: 3 },
+      { id: 'tejedora-tiempo', count: 3 },
+      { id: 'elemental-tormenta', count: 3 },
+      { id: 'obelisco-estelar', count: 2 },
+      { id: 'avatar-cosmos', count: 2 },
+      { id: 'cometa-arcano', count: 3 },
+      { id: 'vortice-mana', count: 3 },
+    ],
+  },
+  VACIO_ENTROPIA: {
+    mana: { vacio: 6, naturaleza: 1, arcano: 13 },
+    cards: [
+      { id: 'devorador-entropico', count: 3 },
+      { id: 'leviatan-abisal', count: 3 },
+      { id: 'parasito-vacio', count: 3 },
+      { id: 'avatar-cosmos', count: 3 },
+      { id: 'golem-runico', count: 3 },
+      { id: 'basilisco-caos', count: 2 },
+      { id: 'cometa-arcano', count: 3 },
+      { id: 'vortice-mana', count: 3 },
+      { id: 'tejedora-tiempo', count: 3 },
+      { id: 'tormenta-mana', count: 2 },
+      { id: 'obelisco-estelar', count: 2 },
+    ],
+  },
+};
+
+const LEGACY_DECK_ALIASES: Record<string, DeckId> = {
+  FURIA: 'FURIA_EMBESTIDA',
+  FURIA_AGRO: 'FURIA_EMBESTIDA',
+  FURIA_CONTROL: 'FURIA_CALDERA',
+  ARCANO: 'ARCANO_GLACIAL',
+  ARCANO_FREEZE: 'ARCANO_GLACIAL',
+  ARCANO_SPELL: 'ARCANO_ESTELAR',
+  MAZO_NATURALEZA: 'NATURALEZA_RAICES',
+  MAZO_FORESTAL_CONTROL: 'NATURALEZA_GUARDIANES',
+  MAZO_ORDEN: 'ORDEN_BASTION',
+  MAZO_CELESTIAL: 'ORDEN_ALBA',
+  MAZO_SOMBRA: 'SOMBRA_CRIPTA',
+  MAZO_ULTIMO_ALIENTO: 'SOMBRA_CRIPTA',
+  MAZO_VACIO: 'VACIO_ABISMO',
+  MAZO_ACUATICO: 'VACIO_ABISMO',
+  NEXO_HIBRIDO: 'VACIO_ENTROPIA',
+  BARAJA_BESTIAS: 'NATURALEZA_RAICES',
+  FORTALEZA_RUNICA: 'ORDEN_BASTION',
+  MAZO_RENEGADOS: 'SOMBRA_NOBLEZA',
+  MAZO_ORCOS_BESTIAS: 'FURIA_EMBESTIDA',
+  MAZO_DOBLE_ATAQUE: 'FURIA_EMBESTIDA',
+};
+
+function normalizeDeckId(factionOrTheme: string): DeckId {
+  if (factionOrTheme in CURATED_DECK_RECIPES) return factionOrTheme as DeckId;
+  return LEGACY_DECK_ALIASES[factionOrTheme] ?? 'ARCANO_GLACIAL';
+}
+
+function addCards(deck: Card[], cardId: string, count: number, deckId: DeckId) {
+  const card = CARDS_DB[cardId];
+  if (!card) throw new Error(`El mazo ${deckId} referencia una carta inexistente: ${cardId}.`);
+  if (!/\.(webp|png)$/i.test(card.artPath)) {
+    throw new Error(`El mazo ${deckId} contiene una carta sin ilustracion final: ${cardId}.`);
+  }
+
+  for (let i = 0; i < count; i++) deck.push({ ...card });
+}
+
+function buildCuratedDeck(deckId: DeckId): Card[] {
+  const recipe = CURATED_DECK_RECIPES[deckId];
   const deck: Card[] = [];
+
+  for (const manaType of MANA_TYPES) {
+    const count = recipe.mana[manaType] ?? 0;
+    if (count > 0) addCards(deck, MANA_SOURCE_CARD_IDS[manaType], count, deckId);
+  }
+  recipe.cards.forEach((entry) => addCards(deck, entry.id, entry.count, deckId));
+
+  if (deck.length !== 50) {
+    throw new Error(`El mazo ${deckId} contiene ${deck.length} cartas, debe contener 50.`);
+  }
+
+  return deck;
+}
+
+export function getPreconstructedDeck(factionOrTheme: string): Card[] {
+  const curatedDeckId = normalizeDeckId(factionOrTheme);
+  const curatedDeck = buildCuratedDeck(curatedDeckId);
+  if (curatedDeck.length === 50) return curatedDeck;
+
+  const deck: Card[] = [];
+  const addFromPool = (preferredPool: Card[], fallbackPool: Card[], count: number) => {
+    const pool = preferredPool.length > 0 ? preferredPool : fallbackPool;
+    if (pool.length === 0) {
+      throw new Error(`No hay cartas disponibles para completar el mazo ${factionOrTheme}.`);
+    }
+
+    for (let i = 0; i < count; i++) {
+      deck.push({ ...pool[i % pool.length] });
+    }
+  };
   
-  if (factionOrTheme === 'FURIA_AGRO') {
+  if (factionOrTheme === 'MAZO_VACIO') {
+    // 10 Furia, 10 Arcano
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-furia'] });
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-arcana'] });
+    const vacioCards = Object.values(CARDS_DB).filter(c => c.faction === 'VACIO');
+    for (let i = 0; i < 30; i++) {
+      const card = vacioCards[i % vacioCards.length];
+      deck.push({ ...card });
+    }
+  } else if (factionOrTheme === 'MAZO_ORDEN') {
+    // 10 Furia, 10 Arcano
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-furia'] });
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-arcana'] });
+    const ordenCards = Object.values(CARDS_DB).filter(c => c.faction === 'ORDEN');
+    for (let i = 0; i < 30; i++) {
+      const card = ordenCards[i % ordenCards.length];
+      deck.push({ ...card });
+    }
+  } else if (factionOrTheme === 'MAZO_ULTIMO_ALIENTO') {
+    // 10 Furia, 10 Arcano
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-furia'] });
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-arcana'] });
+    const deathCards = Object.values(CARDS_DB).filter(c => 
+      c.id === 'fenix-renacido' ||
+      c.rulesText.includes('Último Aliento') ||
+      c.rulesText.includes('muerte') ||
+      c.rulesText.includes('Morir') ||
+      c.rulesText.includes('morir')
+    );
+    for (let i = 0; i < 30; i++) {
+      const card = deathCards[i % deathCards.length];
+      deck.push({ ...card });
+    }
+  } else if (factionOrTheme === 'MAZO_DOBLE_ATAQUE') {
+    // 10 Furia, 10 Arcano
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-furia'] });
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-arcana'] });
+    const attackCards = Object.values(CARDS_DB).filter(c => 
+      c.rulesText.includes('dos veces') ||
+      c.rulesText.includes('Carga') ||
+      c.id === 'furia-nexo' ||
+      c.id === 'impetu-fuego'
+    );
+    for (let i = 0; i < 30; i++) {
+      const card = attackCards[i % attackCards.length];
+      deck.push({ ...card });
+    }
+  } else if (factionOrTheme === 'MAZO_FORESTAL_CONTROL') {
+    // 10 Furia, 10 Arcano
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-furia'] });
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-arcana'] });
+    const forestControlCards = Object.values(CARDS_DB).filter(c => 
+      c.faction === 'NATURALEZA' && 
+      (c.type === 'ESTRUCTURA' || c.rulesText.includes('Cura') || c.rulesText.includes('vida'))
+    );
+    const fallbackForestControl = Object.values(CARDS_DB).filter(c =>
+      c.faction === 'NATURALEZA' && c.type !== 'MANA'
+    );
+    addFromPool(forestControlCards, fallbackForestControl, 30);
+  } else if (factionOrTheme === 'MAZO_SOMBRA') {
+    // 10 Furia, 10 Arcano
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-furia'] });
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-arcana'] });
+    const sombraCards = Object.values(CARDS_DB).filter(c => c.faction === 'SOMBRA');
+    for (let i = 0; i < 30; i++) {
+      const card = sombraCards[i % sombraCards.length];
+      deck.push({ ...card });
+    }
+  } else if (factionOrTheme === 'MAZO_NATURALEZA') {
+    // 10 Furia, 10 Arcano
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-furia'] });
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-arcana'] });
+    const natCards = Object.values(CARDS_DB).filter(c => c.faction === 'NATURALEZA');
+    for (let i = 0; i < 30; i++) {
+      const card = natCards[i % natCards.length];
+      deck.push({ ...card });
+    }
+  } else if (factionOrTheme === 'MAZO_CELESTIAL') {
+    // 10 Furia, 10 Arcano
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-furia'] });
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-arcana'] });
+    const celestialCards = Object.values(CARDS_DB).filter(c => 
+      c.faction === 'ORDEN' || 
+      c.id === 'buho-runico' || 
+      c.name.includes('Celestial') || 
+      c.name.includes('Grifo') || 
+      c.name.includes('Ángel') ||
+      c.name.includes('Fénix')
+    );
+    for (let i = 0; i < 30; i++) {
+      const card = celestialCards[i % celestialCards.length];
+      deck.push({ ...card });
+    }
+  } else if (factionOrTheme === 'MAZO_ACUATICO') {
+    // 10 Furia, 10 Arcano
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-furia'] });
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-arcana'] });
+    const waterCards = Object.values(CARDS_DB).filter(c => 
+      c.name.includes('Glaciar') || 
+      c.name.includes('Glacial') || 
+      c.name.includes('Hielo') || 
+      c.name.includes('Acuático') || 
+      c.name.includes('Abisal') ||
+      c.id === 'golem-glaciar' ||
+      c.id === 'barrera-hielo' ||
+      c.id === 'prision-glacial'
+    );
+    for (let i = 0; i < 30; i++) {
+      const card = waterCards[i % waterCards.length];
+      deck.push({ ...card });
+    }
+  } else if (factionOrTheme === 'MAZO_RENEGADOS') {
+    // 10 Furia, 10 Arcano
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-furia'] });
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-arcana'] });
+    const renegadeCards = Object.values(CARDS_DB).filter(c => 
+      c.id === 'trasgo-piroclastico' || 
+      c.id === 'chispa-fugaz' || 
+      c.rulesText.includes('descarte') || 
+      c.rulesText.includes('Descarte') || 
+      c.rulesText.includes('sí mismo') || 
+      c.name.includes('Renegado') ||
+      c.name.includes('Esclavo') ||
+      c.name.includes('Espectro')
+    );
+    for (let i = 0; i < 30; i++) {
+      const card = renegadeCards[i % renegadeCards.length];
+      deck.push({ ...card });
+    }
+  } else if (factionOrTheme === 'MAZO_ORCOS_BESTIAS') {
+    // 10 Furia, 10 Arcano
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-furia'] });
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-arcana'] });
+    const orcBeastCards = Object.values(CARDS_DB).filter(c => 
+      c.subtype === 'Bestia' || 
+      c.name.includes('Orco') || 
+      c.name.includes('Bestia') || 
+      c.name.includes('Minotauro') ||
+      c.id === 'sabueso-brasa' ||
+      c.id === 'draco-magma'
+    );
+    for (let i = 0; i < 30; i++) {
+      const card = orcBeastCards[i % orcBeastCards.length];
+      deck.push({ ...card });
+    }
+  } else if (factionOrTheme === 'NEXO_HIBRIDO') {
+    // 10 Furia Mana, 10 Arcano Mana
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-furia'] });
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-arcana'] });
+    const base = [
+      { id: 'sabueso-brasa', count: 3 },
+      { id: 'berserker-ignivoro', count: 2 },
+      { id: 'dragon-caldera', count: 1 },
+      { id: 'lluvia-ceniza', count: 2 },
+      { id: 'guerrero-ceniza', count: 3 },
+      { id: 'draco-magma', count: 2 },
+      { id: 'trasgo-piroclastico', count: 2 },
+      { id: 'centinela-cristal', count: 3 },
+      { id: 'tejedora-escarcha', count: 2 },
+      { id: 'prision-glacial', count: 2 },
+      { id: 'cometa-arcano', count: 2 },
+      { id: 'buho-runico', count: 2 },
+      { id: 'mago-runa-helada', count: 2 },
+      { id: 'tejedora-tiempo', count: 2 }
+    ];
+    base.forEach(item => {
+      for (let i = 0; i < item.count; i++) deck.push({ ...CARDS_DB[item.id] });
+    });
+  } else if (factionOrTheme === 'BARAJA_BESTIAS') {
+    // 10 Furia Mana, 10 Arcano Mana
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-furia'] });
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-arcana'] });
+    const base = [
+      { id: 'sabueso-brasa', count: 4 },
+      { id: 'buho-runico', count: 4 },
+      { id: 'draco-magma', count: 4 },
+      { id: 'dragon-caldera', count: 2 },
+      { id: 'elemental-lava', count: 4 },
+      { id: 'elemental-tormenta', count: 4 },
+      { id: 'chispa-fugaz', count: 4 },
+      { id: 'congelacion-rapida', count: 4 }
+    ];
+    base.forEach(item => {
+      for (let i = 0; i < item.count; i++) deck.push({ ...CARDS_DB[item.id] });
+    });
+  } else if (factionOrTheme === 'FORTALEZA_RUNICA') {
+    // 10 Furia Mana, 10 Arcano Mana
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-furia'] });
+    for (let i = 0; i < 10; i++) deck.push({ ...CARDS_DB['fuente-arcana'] });
+    const base = [
+      { id: 'forja-carmesi', count: 4 },
+      { id: 'torre-horizonte', count: 4 },
+      { id: 'templo-runico', count: 4 },
+      { id: 'muro-pomez', count: 4 },
+      { id: 'golem-fundicion', count: 3 },
+      { id: 'golem-glaciar', count: 3 },
+      { id: 'centinela-cristal', count: 4 },
+      { id: 'prision-glacial', count: 4 }
+    ];
+    base.forEach(item => {
+      for (let i = 0; i < item.count; i++) deck.push({ ...CARDS_DB[item.id] });
+    });
+  } else if (factionOrTheme === 'FURIA_AGRO') {
     // 18 Furia Mana
     for (let i = 0; i < 18; i++) deck.push({ ...CARDS_DB['fuente-furia'] });
     const base = [
@@ -1111,10 +2560,12 @@ export function getPreconstructedDeck(factionOrTheme: string): Card[] {
       c.type === 'UNIDAD' && 
       ((c.cost.generic || 0) + (c.cost.furia || 0)) <= 3
     );
-    for (let i = 0; i < 16; i++) {
-      const card = genFuriaAgro[i % genFuriaAgro.length];
-      deck.push({ ...card });
-    }
+    const fallbackFuriaAgro = Object.values(CARDS_DB).filter(c =>
+      c.faction === 'FURIA' &&
+      c.type === 'UNIDAD' &&
+      ((c.cost.generic || 0) + (c.cost.furia || 0)) <= 3
+    );
+    addFromPool(genFuriaAgro, fallbackFuriaAgro, 16);
   } else if (factionOrTheme === 'FURIA_CONTROL') {
     // 22 Furia Mana
     for (let i = 0; i < 22; i++) deck.push({ ...CARDS_DB['fuente-furia'] });
@@ -1133,10 +2584,12 @@ export function getPreconstructedDeck(factionOrTheme: string): Card[] {
       c.id.startsWith('gen-furia-') && 
       ((c.cost.generic || 0) + (c.cost.furia || 0)) >= 4
     );
-    for (let i = 0; i < 16; i++) {
-      const card = genFuriaHeavy[i % genFuriaHeavy.length];
-      deck.push({ ...card });
-    }
+    const fallbackFuriaHeavy = Object.values(CARDS_DB).filter(c =>
+      c.faction === 'FURIA' &&
+      c.type !== 'MANA' &&
+      ((c.cost.generic || 0) + (c.cost.furia || 0)) >= 4
+    );
+    addFromPool(genFuriaHeavy, fallbackFuriaHeavy, 16);
   } else if (factionOrTheme === 'ARCANO_FREEZE') {
     // 20 Arcano Mana
     for (let i = 0; i < 20; i++) deck.push({ ...CARDS_DB['fuente-arcana'] });
@@ -1155,10 +2608,11 @@ export function getPreconstructedDeck(factionOrTheme: string): Card[] {
       c.id.startsWith('gen-arcano-') && 
       (c.rulesText.includes('Congela') || c.rulesText.includes('congelar') || c.type === 'ESTRUCTURA' || c.type === 'UNIDAD')
     );
-    for (let i = 0; i < 16; i++) {
-      const card = genArcanoControl[i % genArcanoControl.length];
-      deck.push({ ...card });
-    }
+    const fallbackArcanoControl = Object.values(CARDS_DB).filter(c =>
+      c.faction === 'ARCANO' &&
+      (c.rulesText.includes('Congela') || c.rulesText.includes('congelar') || c.type === 'ESTRUCTURA' || c.type === 'UNIDAD')
+    );
+    addFromPool(genArcanoControl, fallbackArcanoControl, 16);
   } else if (factionOrTheme === 'ARCANO_SPELL') {
     // 20 Arcano Mana
     for (let i = 0; i < 20; i++) deck.push({ ...CARDS_DB['fuente-arcana'] });
@@ -1176,10 +2630,10 @@ export function getPreconstructedDeck(factionOrTheme: string): Card[] {
     const genArcanoSpells = Object.values(CARDS_DB).filter(c => 
       c.id.startsWith('gen-arcano-') && c.type === 'HECHIZO'
     );
-    for (let i = 0; i < 16; i++) {
-      const card = genArcanoSpells[i % genArcanoSpells.length];
-      deck.push({ ...card });
-    }
+    const fallbackArcanoSpells = Object.values(CARDS_DB).filter(c =>
+      c.faction === 'ARCANO' && c.type === 'HECHIZO'
+    );
+    addFromPool(genArcanoSpells, fallbackArcanoSpells, 16);
   } else if (factionOrTheme === 'FURIA') {
     // Default Furia composition
     for (let i = 0; i < 20; i++) deck.push({ ...CARDS_DB['fuente-furia'] });
@@ -1224,6 +2678,11 @@ export function getPreconstructedDeck(factionOrTheme: string): Card[] {
     composition.forEach(item => {
       for (let i = 0; i < item.count; i++) deck.push({ ...CARDS_DB[item.id] });
     });
+  }
+
+  const invalidCardIndex = deck.findIndex((card) => !card.id || !card.cost);
+  if (invalidCardIndex !== -1) {
+    throw new Error(`El mazo ${factionOrTheme} contiene una carta invalida en la posicion ${invalidCardIndex}.`);
   }
 
   return deck;

@@ -1,0 +1,38 @@
+import type { CardKeywordId } from '../types/card';
+
+export const CARD_KEYWORDS_BY_CARD_ID = {
+  'sabueso-brasa': ['charge'],
+  'dragon-caldera': ['flying', 'battlecry'],
+  'infiltrado-volcanico': ['diagonal'],
+  'fenix-renacido': ['flying', 'last-breath'],
+  'draco-magma': ['charge'],
+  'trasgo-piroclastico': ['charge', 'battlecry'],
+  'furia-nexo': ['charge'],
+  'centinela-cristal': ['resistance'],
+  'golem-glaciar': ['spell-immunity'],
+  'buho-runico': ['flying'],
+  'avatar-cosmos': ['spell-immunity'],
+  'templo-runico': ['resistance'],
+  'devorador-entropico': ['flying', 'resistance'],
+  'basilisco-caos': ['diagonal'],
+  'clerigo-luz': ['resistance'],
+  'demonio-infernal': ['charge'],
+  'espectro-siniestro': ['flying'],
+  'esqueleto-guerrero': ['resistance'],
+  'gigante-magma': ['resistance'],
+  'golem-runico': ['resistance'],
+  'grifo-orden': ['flying'],
+  'guardian-escarchado': ['resistance'],
+  'leviatan-abisal': ['flying'],
+  'murcielago-sombra': ['flying'],
+  'orco-comandante': ['charge'],
+  'orco-guerrero': ['charge'],
+  'parasito-vacio': ['diagonal'],
+  'pegaso-celestial': ['flying'],
+  'zombi-hambriento': ['resistance'],
+  'golem-piedra': ['resistance'],
+  'minotauro-brasa': ['charge'],
+  'centauro-guerrero': ['diagonal'],
+} as const satisfies Record<string, readonly CardKeywordId[]>;
+
+export type StructuredKeywordCardId = keyof typeof CARD_KEYWORDS_BY_CARD_ID;

@@ -1,22 +1,76 @@
 class AudioSynthService {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
+  private ambientGain: GainNode | null = null;
+  private ambientOscillators: OscillatorNode[] = [];
   private soundEnabled: boolean = false;
 
   init() {
-    if (this.ctx) return;
+    if (this.ctx) {
+      if (this.ctx.state === 'suspended') void this.ctx.resume();
+      return;
+    }
     try {
-      this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.setValueAtTime(0.2, this.ctx.currentTime); // Master volume 20%
-      this.masterGain.connect(this.ctx.destination);
-    } catch (e) {
-      console.warn("Web Audio API not supported", e);
+      const audioWindow = window as Window & { webkitAudioContext?: typeof AudioContext };
+      const AudioContextConstructor = typeof AudioContext !== 'undefined'
+        ? AudioContext
+        : audioWindow.webkitAudioContext;
+      if (!AudioContextConstructor) return;
+      const context = new AudioContextConstructor();
+      const masterGain = context.createGain();
+      masterGain.gain.setValueAtTime(0.2, context.currentTime); // Master volume 20%
+      masterGain.connect(context.destination);
+      this.ctx = context;
+      this.masterGain = masterGain;
+    } catch (error) {
+      console.warn('Web Audio API not supported', error);
     }
   }
 
   toggleSound(enabled: boolean) {
     this.soundEnabled = enabled;
+    if (enabled) {
+      this.init();
+      this.startAmbient();
+    } else {
+      this.stopAmbient();
+    }
+  }
+
+  private startAmbient() {
+    if (!this.ctx || !this.masterGain || this.ambientOscillators.length > 0) return;
+    const gain = this.ctx.createGain();
+    const filter = this.ctx.createBiquadFilter();
+    gain.gain.setValueAtTime(0.018, this.ctx.currentTime);
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(240, this.ctx.currentTime);
+    gain.connect(filter);
+    filter.connect(this.masterGain);
+
+    this.ambientOscillators = [55, 82.41].map((frequency, index) => {
+      const oscillator = this.ctx!.createOscillator();
+      oscillator.type = index === 0 ? 'sine' : 'triangle';
+      oscillator.frequency.setValueAtTime(frequency, this.ctx!.currentTime);
+      oscillator.detune.setValueAtTime(index === 0 ? -4 : 5, this.ctx!.currentTime);
+      oscillator.connect(gain);
+      oscillator.start();
+      return oscillator;
+    });
+    this.ambientGain = gain;
+  }
+
+  private stopAmbient() {
+    for (const oscillator of this.ambientOscillators) {
+      try {
+        oscillator.stop();
+        oscillator.disconnect();
+      } catch {
+        // An already stopped oscillator needs no further cleanup.
+      }
+    }
+    this.ambientOscillators = [];
+    this.ambientGain?.disconnect();
+    this.ambientGain = null;
   }
 
   // Soft card select/hover click
@@ -41,6 +95,63 @@ class AudioSynthService {
 
     osc.start(time);
     osc.stop(time + 0.04);
+  }
+
+  playManaPulse() {
+    if (!this.soundEnabled) return;
+    this.init();
+    if (!this.ctx || !this.masterGain) return;
+    const time = this.ctx.currentTime;
+
+    [220, 440, 660].forEach((frequency, index) => {
+      const oscillator = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(frequency, time + index * 0.035);
+      oscillator.frequency.exponentialRampToValueAtTime(frequency * 1.5, time + 0.24 + index * 0.035);
+      gain.gain.setValueAtTime(0.055 / (index + 1), time + index * 0.035);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.28 + index * 0.035);
+      oscillator.connect(gain);
+      gain.connect(this.masterGain!);
+      oscillator.start(time + index * 0.035);
+      oscillator.stop(time + 0.32 + index * 0.035);
+    });
+  }
+
+  playMove() {
+    if (!this.soundEnabled) return;
+    this.init();
+    if (!this.ctx || !this.masterGain) return;
+    const time = this.ctx.currentTime;
+    const oscillator = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    oscillator.type = 'triangle';
+    oscillator.frequency.setValueAtTime(180, time);
+    oscillator.frequency.exponentialRampToValueAtTime(420, time + 0.13);
+    gain.gain.setValueAtTime(0.045, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.16);
+    oscillator.connect(gain);
+    gain.connect(this.masterGain);
+    oscillator.start(time);
+    oscillator.stop(time + 0.18);
+  }
+
+  playTerrainBreak() {
+    if (!this.soundEnabled) return;
+    this.init();
+    if (!this.ctx || !this.masterGain) return;
+    const time = this.ctx.currentTime;
+    const oscillator = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    oscillator.type = 'triangle';
+    oscillator.frequency.setValueAtTime(125, time);
+    oscillator.frequency.exponentialRampToValueAtTime(32, time + 0.42);
+    gain.gain.setValueAtTime(0.22, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.42);
+    oscillator.connect(gain);
+    gain.connect(this.masterGain);
+    oscillator.start(time);
+    oscillator.stop(time + 0.45);
   }
 
   // Summon Slam (deep seismic thud)
@@ -89,7 +200,7 @@ class AudioSynthService {
       noiseGain.connect(this.masterGain);
       noise.start(time);
       noise.stop(time + 0.22);
-    } catch (e) {
+    } catch {
       // Fallback if buffer creation fails
     }
   }
