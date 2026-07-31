@@ -1,0 +1,75 @@
+name: Keep Supabase project active
+
+on:
+  schedule:
+    # Supabase recommends a few database requests each day for low-activity
+    # Free Plan projects. Times are UTC and avoid the top of the hour.
+    - cron: '23 2,10,18 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-keepalive
+  cancel-in-progress: true
+
+jobs:
+  database-health-check:
+    name: Minimal database health check
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      EXPECTED_SUPABASE_URL: https://vzqlcdhpywixbmjldhzf.supabase.co
+      SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+
+    steps:
+      - name: Call the restricted keep-alive RPC
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${SUPABASE_URL:-}" || -z "${SUPABASE_PUBLISHABLE_KEY:-}" ]]; then
+            echo "::error::Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY."
+            exit 1
+          fi
+
+          if [[ "$SUPABASE_URL" != "$EXPECTED_SUPABASE_URL" ]]; then
+            echo "::error::VITE_SUPABASE_URL does not match the expected Supabase project."
+            exit 1
+          fi
+
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+
+          http_code="$(
+            curl \
+              --silent \
+              --show-error \
+              --request POST \
+              --connect-timeout 10 \
+              --max-time 20 \
+              --retry 2 \
+              --retry-delay 2 \
+              --retry-all-errors \
+              --output "$response_file" \
+              --write-out '%{http_code}' \
+              --header "apikey: ${SUPABASE_PUBLISHABLE_KEY}" \
+              --header 'Content-Type: application/json' \
+              --data '{}' \
+              "${SUPABASE_URL}/rest/v1/rpc/project_keepalive"
+          )"
+
+          if [[ "$http_code" != "200" ]]; then
+            echo "::error::Supabase keep-alive returned HTTP ${http_code}."
+            exit 1
+          fi
+
+          response_body="$(tr -d '\r\n[:space:]' < "$response_file")"
+          if [[ "$response_body" != "true" ]]; then
+            echo "::error::Supabase keep-alive returned an unexpected response."
+            exit 1
+          fi
+
+          echo "Supabase database health check completed successfully."
